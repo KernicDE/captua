@@ -106,6 +106,60 @@ Add to `~/.config/sway/config`:
 for_window [app_id="captua-overlay"] floating enable, move position center, resize set 80 ppt 80 ppt, border none
 ```
 
+## Set Captua as your default screenshot tool
+
+### Hyprland
+
+Add key bindings to `~/.config/hypr/hyprland.conf`:
+
+```ini
+# Region capture
+bind = , Print, exec, captua
+# Full screen
+bind = SHIFT, Print, exec, captua --screen
+# Active window
+bind = ALT, Print, exec, captua --window
+```
+
+### KDE Plasma
+
+1. Open *System Settings → Shortcuts → Custom Shortcuts*
+2. Create three new **Global Shortcuts → Command/URL** items:
+
+| Trigger | Command | Shortcut |
+|---|---|---|
+| Captua Region | `captua` | `Print` |
+| Captua Screen | `captua --screen` | `Shift+Print` |
+| Captua Window | `captua --window` | `Meta+Print` |
+
+3. Disable or rebind Spectacle's shortcuts so they don't conflict.
+
+### GNOME
+
+1. Open *Settings → Keyboard → Keyboard Shortcuts → Custom Shortcuts*
+2. Add three shortcuts:
+
+| Name | Command | Shortcut |
+|---|---|---|
+| Captua Region | `captua` | `Print` |
+| Captua Screen | `captua --screen` | `Shift+Print` |
+| Captua Window | `captua --window` | `Alt+Print` |
+
+GNOME's default screenshot shortcuts will conflict — remove or rebind them in the same settings panel.
+
+### Sway
+
+Add to `~/.config/sway/config`:
+
+```
+# Region capture
+bindsym Print exec captua
+# Full screen
+bindsym Shift+Print exec captua --screen
+# Active window
+bindsym $mod+Print exec captua --window
+```
+
 ## Usage
 
 ```bash
