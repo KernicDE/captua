@@ -98,6 +98,25 @@ fi
 
 export LD_LIBRARY_PATH="${SITE_PACKAGES}/PySide6/Qt6/lib:${LD_LIBRARY_PATH:-}"
 
+# Fix Pillow bundled libs: linuxdeploy can't resolve deps when SONAMEs have hash suffixes
+PILLOW_LIBS="${SITE_PACKAGES}/pillow.libs"
+if [ -d "${PILLOW_LIBS}" ]; then
+    echo "=== Creating symlinks for Pillow bundled libraries ==="
+    cd "${PILLOW_LIBS}"
+    for f in lib*.so*; do
+        # e.g. libsharpyuv-0bacc318.so.0.1.2 -> create libsharpyuv.so.0, libsharpyuv.so.0.1, etc.
+        if [[ "${f}" =~ ^(lib[a-zA-Z0-9]+)-[a-f0-9]+\.so(\.([0-9]+)(\.([0-9]+)(\.([0-9]+))?)?)?$ ]]; then
+            base="${BASH_REMATCH[1]}"
+            suffix="${BASH_REMATCH[2]}"
+            if [ -n "${suffix}" ] && [ ! -e "${base}${suffix}" ]; then
+                ln -sf "${f}" "${base}${suffix}"
+            fi
+        fi
+    done
+    cd "${BUILD_DIR}"
+    export LD_LIBRARY_PATH="${PILLOW_LIBS}:${LD_LIBRARY_PATH}"
+fi
+
 echo "=== Running linuxdeploy ==="
 # AppImages need libfuse2 to run; if it's missing, extract and run
 export APPIMAGE_EXTRACT_AND_RUN=1
