@@ -52,6 +52,7 @@ jobs:
             libpango-1.0-0 \
             libcairo2 \
             libasound2 \
+            libpcsclite1 \
             libwayland-client0 \
             libwayland-cursor0 \
             libwayland-egl1 \
