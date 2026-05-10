@@ -165,14 +165,20 @@ if [ -d "${PYSIDE6_DIR}" ]; then
     rm -rf "${PYSIDE6_DIR}/include"
 
     # Remove Qt plugin directories with missing system deps.
-    # Keep only: platforms, platformthemes, xcbglintegrations, wayland*,
-    #            imageformats, iconengines, styles, accessibility.
+    # Keep only: platforms, platformthemes, xcbglintegrations,
+    #            wayland-decoration-client, wayland-graphics-integration-client,
+    #            wayland-shell-integration, imageformats, iconengines, styles, accessibility.
     if [ -d "${PYSIDE6_DIR}/Qt/plugins" ]; then
         for plugin_dir in "${PYSIDE6_DIR}/Qt/plugins"/*; do
             [ -d "${plugin_dir}" ] || continue
             basename=$(basename "${plugin_dir}")
             case "${basename}" in
-                platforms|platformthemes|xcbglintegrations|wayland*|imageformats|iconengines|styles|accessibility)
+                platforms|platformthemes|xcbglintegrations|imageformats|iconengines|styles|accessibility)
+                    ;;
+                wayland-decoration-client|wayland-graphics-integration-client|wayland-shell-integration)
+                    ;;
+                wayland*)
+                    rm -rf "${plugin_dir}"
                     ;;
                 *)
                     rm -rf "${plugin_dir}"
