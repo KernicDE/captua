@@ -21,9 +21,6 @@ tar -xzf python.tar.gz -C "${APPDIR}/usr" --strip-components=1
 rm python.tar.gz
 
 PYTHON="${APPDIR}/usr/bin/python3"
-"${PYTHON}" -m ensurepip --upgrade
-"${PYTHON}" -m pip install --upgrade pip
-
 echo "=== Installing Python dependencies into AppDir ==="
 "${PYTHON}" -m pip install \
     --prefix="${APPDIR}/usr" \
@@ -102,6 +99,9 @@ fi
 export LD_LIBRARY_PATH="${SITE_PACKAGES}/PySide6/Qt6/lib:${LD_LIBRARY_PATH:-}"
 
 echo "=== Running linuxdeploy ==="
+# AppImages need libfuse2 to run; if it's missing, extract and run
+export APPIMAGE_EXTRACT_AND_RUN=1
+
 set +e
 ./linuxdeploy \
     --appdir="${APPDIR}" \
