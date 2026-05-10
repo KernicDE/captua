@@ -139,7 +139,7 @@ if [ -d "${PYSIDE6_DIR}" ]; then
     for tool in designer linguist lrelease lupdate qml qmlcachegen qmlimportscanner \
                 balsam balsamui qmllint qmleasing qmlprofiler qmltestrunner qt-cmake \
                 qt-configure-module qtpaths qtplugininfo pixeltool qsb assistant \
-                qmlformat; do
+                qmlformat svgtoqml; do
         rm -f "${PYSIDE6_DIR}/${tool}"
     done
 
