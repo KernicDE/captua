@@ -195,6 +195,7 @@ class CanvasView(QGraphicsView):
             factor = 1.15 if delta > 0 else 1 / 1.15
             self._zoom *= factor
             self.scale(factor, factor)
+            self.viewport().update()
             event.accept()
         else:
             super().wheelEvent(event)
@@ -370,6 +371,11 @@ class CanvasView(QGraphicsView):
             event.accept()
             return
         super().mousePressEvent(event)
+
+    def scrollContentsBy(self, dx: int, dy: int) -> None:
+        """Override to force a full viewport repaint after any scroll."""
+        super().scrollContentsBy(dx, dy)
+        self.viewport().update()
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         if self._panning and self._pan_start is not None:
