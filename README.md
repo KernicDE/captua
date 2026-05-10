@@ -45,7 +45,11 @@ pip install -e .
 | Fedora | `dnf install grim slurp wl-clipboard` |
 | openSUSE | `zypper install grim slurp wl-clipboard` |
 
-## Hyprland Setup
+## Window Manager / Desktop Environment Setup
+
+Captua requests a frameless, always-on-top window. Depending on your compositor you may want to add rules so the overlay floats and is centered.
+
+### Hyprland
 
 Add these window rules to `~/.config/hypr/hyprland.conf`:
 
@@ -54,6 +58,52 @@ windowrulev2 = float, class:(captua-overlay)
 windowrulev2 = center, class:(captua-overlay)
 windowrulev2 = size 80%, class:(captua-overlay)
 windowrulev2 = noanim, class:(captua-overlay)
+```
+
+### KDE Plasma (KWin)
+
+Create a window rule in *System Settings → Window Management → Window Rules → New*:
+
+| Property | Value |
+|---|---|
+| Window class | `captua-overlay` |
+| Window types | Normal window |
+| **Position** | Centered |
+| **Size** | 80% of screen |
+| **Window matching** | Exact match |
+| **Keep above** | Force → Yes |
+| **No border** | Force → Yes |
+| **Fullscreen** | Force → No |
+
+Or add the rule directly to `~/.config/kwinrulesrc`:
+
+```ini
+[captua-overlay]
+description=Captua Overlay
+clientmachine=localhost
+wmclass=captua-overlay
+wmclassmatch=1
+position=3
+size=80
+above=true
+aboverule=3
+noborder=true
+noborderrule=3
+fullscreenrule=2
+```
+
+### GNOME (Mutter)
+
+GNOME does not have built-in per-window rules. Captua already requests a frameless, always-on-top window, so it should work out of the box as a regular window.
+
+If you use a tiling extension (e.g. **Pop Shell**, **Forge**, or **Tiling Assistant**), add `captua-overlay` to the floating-windows exception list so it is not tiled.
+
+### Sway
+
+Add to `~/.config/sway/config`:
+
+```
+for_window [app_id="captua-overlay"] floating enable, move position center, resize set 80 ppt 80 ppt, border none
 ```
 
 ## Usage
