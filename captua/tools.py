@@ -6,7 +6,7 @@ from io import BytesIO
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, UnidentifiedImageError
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPixmap, QTextCursor
+from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPen, QPixmap, QTextCursor
 
 from .history import AddItemCommand
 from .items import (
@@ -27,6 +27,7 @@ from .items import (
     SpotlightItem,
     TextItem,
 )
+from PySide6.QtWidgets import QGraphicsEllipseItem
 
 
 class ToolProperties:
@@ -353,14 +354,16 @@ class RulerTool(Tool):
 class SpotlightTool(Tool):
     def mouse_press(self, event: QMouseEvent, pos: QPointF) -> None:
         self._start = pos
-        overlay = self.scene.sceneRect()
+        # Overlay only the screenshot images, not the backdrop
+        overlay = self.scene.image_content_rect()
         self._active_item = SpotlightItem(
             overlay,
             QRectF(pos, pos),
             self.props.fill_color,
             self.props.fill_alpha,
         )
-        self._active_item.setZValue(0.8)
+        # Keep spotlight just above images (z=0) but below annotations (z>=0.5)
+        self._active_item.setZValue(0.1)
         self.scene.addItem(self._active_item)
 
     def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
@@ -448,27 +451,42 @@ class BlurTool(Tool):
 
 class MagnifierTool(Tool):
     def mouse_press(self, event: QMouseEvent, pos: QPointF) -> None:
-        self._start = pos
-        self._active_item = RectangleItem(
-            QRectF(pos, pos), QColor("#7E9CD8"), 2, 0
-        )
+        self._center = pos
+        self._active_item = QGraphicsEllipseItem(QRectF(0, 0, 0, 0))
+        self._active_item.setPen(QPen(QColor("#7E9CD8"), 2))
+        self._active_item.setBrush(QColor("#7E9CD8"))
+        self._active_item.setOpacity(0.3)
         self._active_item.setZValue(1)
-        self._active_item.setOpacity(0.5)
         self.scene.addItem(self._active_item)
 
     def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
-            self._active_item.setRect(QRectF(self._start, pos).normalized())
+            radius = math.hypot(pos.x() - self._center.x(), pos.y() - self._center.y())
+            self._active_item.setRect(
+                self._center.x() - radius,
+                self._center.y() - radius,
+                radius * 2,
+                radius * 2,
+            )
 
     def mouse_release(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
-            rect = self._active_item.rect()
+            ellipse_rect = self._active_item.rect()
             self.scene.removeItem(self._active_item)
             self._active_item = None
-            zoomed = self._zoom_region(rect)
+            # Use a square bounding the circle for capture so the zoomed
+            # pixmap fills the circular lens without distortion.
+            radius = ellipse_rect.width() / 2
+            capture_rect = QRectF(
+                self._center.x() - radius,
+                self._center.y() - radius,
+                radius * 2,
+                radius * 2,
+            )
+            zoomed = self._zoom_region(capture_rect)
             if zoomed is not None and not zoomed.isNull():
-                src_c = QPointF(rect.center().x(), rect.center().y())
-                src_r = max(rect.width(), rect.height()) / 2 * 1.1
+                src_c = self._center
+                src_r = radius * 1.1
                 zoom = max(1.5, self.props.zoom_level)
                 dest_r = src_r * zoom
                 scene_rect = self.scene.sceneRect()

@@ -111,6 +111,13 @@ class CanvasScene(QGraphicsScene):
         items.extend(self._image_items)
         return items
 
+    def image_content_rect(self) -> QRectF:
+        """Bounding rect of all image items (screenshots), ignoring annotations."""
+        rect = QRectF()
+        for item in self.image_items():
+            rect = rect.united(item.mapRectToScene(item.boundingRect()))
+        return rect
+
     def _expand_scene_if_needed(self) -> None:
         """Fit scene rect tightly around all items with minimum 25 px padding."""
         old_rect = self.sceneRect()
