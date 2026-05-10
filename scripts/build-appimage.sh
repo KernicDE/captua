@@ -195,7 +195,7 @@ if [ -d "${PYSIDE6_DIR}" ]; then
             [ -e "${f}" ] || continue
             basename=$(basename "${f}")
             case "${basename}" in
-                libQt6Core.so*|libQt6Gui.so*|libQt6Widgets.so*|libQt6DBus.so*|libQt6OpenGL.so*|libQt6WaylandClient.so*|libQt6Svg.so*|libicui18n.so*|libicuuc.so*|libicudata.so*)
+                libQt6Core.so*|libQt6Gui.so*|libQt6Widgets.so*|libQt6DBus.so*|libQt6OpenGL.so*|libQt6WaylandClient.so*|libQt6Svg.so*|libQt6XcbQpa.so*|libicui18n.so*|libicuuc.so*|libicudata.so*)
                     ;;
                 *)
                     rm -f "${f}"
