@@ -20,30 +20,57 @@ A fast, lightweight screenshot annotation tool for **Linux / Wayland**.
 
 ## Install
 
-### AppImage (recommended)
+### Quick install (recommended)
 
-Download the latest `Captua-x86_64.AppImage` from the [Releases](https://github.com/KernicDE/captua/releases) page, make it executable, and run:
+Download and run the installer from the latest release:
 
 ```bash
-chmod +x Captua-x86_64.AppImage
-./Captua-x86_64.AppImage
+curl -fsSL https://github.com/KernicDE/captua/releases/latest/download/install.sh -o install-captua.sh
+chmod +x install-captua.sh
+./install-captua.sh
 ```
 
-> System dependencies `grim`, `slurp`, and `wl-clipboard` must still be installed on your system (see below).
+The installer will:
+1. Detect your distro and install `grim`, `slurp`, and `wl-clipboard`
+2. Create a Python virtual environment at `~/.local/share/captua/venv`
+3. Install Captua and its Python dependencies
+4. Place a `captua` launcher in `~/.local/bin/`
+5. Install a `.desktop` entry
 
-### From source
+> Make sure `~/.local/bin` is in your `PATH`.
+
+### From source (for development)
 
 ```bash
+# Clone
+git clone https://github.com/KernicDE/captua.git
+cd captua
+
+# Create a venv and install
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e .
+
+# Or run directly without installing
+./run.sh
 ```
 
 ### System dependencies
+
+If you prefer to install manually, you need:
+
+| Package | Purpose |
+|---------|---------|
+| `grim` | Screenshot capture |
+| `slurp` | Region selection |
+| `wl-clipboard` | Clipboard integration |
 
 | Distro | Command |
 |--------|---------|
 | Arch | `pacman -S grim slurp wl-clipboard` |
 | Fedora | `dnf install grim slurp wl-clipboard` |
 | openSUSE | `zypper install grim slurp wl-clipboard` |
+| Debian / Ubuntu | `apt-get install grim slurp wl-clipboard` |
 
 ## Window Manager / Desktop Environment Setup
 
@@ -192,7 +219,7 @@ See [`docs/GUIDE.md`](docs/GUIDE.md) for the full user guide.
 
 ## Tech Stack
 
-- Python 3.12+
+- Python 3.11+
 - PySide6 (Qt6)
 - grim, slurp, wl-clipboard (system deps)
 

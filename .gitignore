@@ -35,10 +35,5 @@ env/
 *.swo
 *~
 
-# AppImage build artifacts
-build-appimage/
-Captua-x86_64.AppImage
-*.AppImage
-
 # Misc
 .DS_Store

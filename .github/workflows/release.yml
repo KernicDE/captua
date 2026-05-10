@@ -9,64 +9,24 @@ permissions:
   contents: write
 
 jobs:
-  build-appimage:
-    runs-on: ubuntu-22.04
+  release:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install system dependencies
+      - name: Package release assets
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgl1-mesa-dev \
-            libxkbcommon-x11-0 \
-            libxcb-cursor0 \
-            libxcb-keysyms1 \
-            libxcb-shape0 \
-            libxcb-icccm4 \
-            libxcb-render-util0 \
-            libxcb-xinerama0 \
-            libxcb-xkb1 \
-            libxcb-randr0 \
-            libxcb-image0 \
-            libxcb-util1 \
-            libxcb-xfixes0 \
-            libfontconfig1 \
-            libdbus-1-3 \
-            libxcomposite1 \
-            libxdamage1 \
-            libxrandr2 \
-            libxtst6 \
-            libnss3 \
-            libatk1.0-0 \
-            libatk-bridge2.0-0 \
-            libcups2 \
-            libdrm2 \
-            libgbm1 \
-            libpango-1.0-0 \
-            libcairo2 \
-            libasound2 \
-            libpcsclite1 \
-            libwayland-client0 \
-            libwayland-cursor0 \
-            libwayland-egl1 \
-            file \
-            libfuse2
+          mkdir -p release-assets
+          # Create a clean source tarball excluding build artifacts
+          git archive --format=tar.gz --prefix=captua/ HEAD > release-assets/captua-source.tar.gz
+          # Include the install script separately for convenience
+          cp scripts/install.sh release-assets/
 
-      - name: Build AppImage
-        run: |
-          chmod +x scripts/build-appimage.sh
-          ./scripts/build-appimage.sh
-
-      - name: Upload AppImage to Release
+      - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            Captua-x86_64.AppImage
+            release-assets/captua-source.tar.gz
+            release-assets/install.sh
           generate_release_notes: true
