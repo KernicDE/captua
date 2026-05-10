@@ -1157,10 +1157,8 @@ class CanvasImageItem(QGraphicsPixmapItem):
     def __init__(self, pixmap: QPixmap, corner_radius: float = 0, parent=None) -> None:
         super().__init__(pixmap, parent)
         self._corner_radius = corner_radius
-        self.setFlags(
-            QGraphicsItem.GraphicsItemFlag.ItemIsSelectable
-            | QGraphicsItem.GraphicsItemFlag.ItemIsMovable
-        )
+        # Images are not movable — only annotations should expand the backdrop
+        self.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
 
     def set_corner_radius(self, radius: float) -> None:
         self._corner_radius = radius

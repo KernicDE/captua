@@ -135,6 +135,7 @@ class CanvasView(QGraphicsView):
     """View with zoom, pan, tool routing, and shortcut handling."""
 
     tool_finished = Signal()
+    tool_selected = Signal(str)
 
     def __init__(self, scene: CanvasScene, parent=None) -> None:
         super().__init__(scene, parent)
@@ -183,6 +184,12 @@ class CanvasView(QGraphicsView):
         self._active_tool = tool
         if self._active_tool is not None:
             self._active_tool.activate()
+        # Ensure the view has focus when returning to select mode so
+        # keyboard shortcuts keep working (unless a text item is being edited).
+        if self._active_tool is not None and not self._active_tool.handles_mouse:
+            scene = self.scene()
+            if scene is not None and scene.focusItem() is None:
+                self.setFocus()
 
     def _scene_pos(self, event: QMouseEvent):
         """Map viewport mouse position to scene coordinates."""
@@ -490,6 +497,30 @@ class CanvasView(QGraphicsView):
             event.ignore()
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
+        # Tool shortcuts — mirror the toolbar so they work when the canvas has focus
+        tool_keys = {
+            Qt.Key.Key_V: "select",
+            Qt.Key.Key_R: "rectangle",
+            Qt.Key.Key_O: "ellipse",
+            Qt.Key.Key_L: "line",
+            Qt.Key.Key_A: "arrow",
+            Qt.Key.Key_P: "pen",
+            Qt.Key.Key_M: "marker",
+            Qt.Key.Key_T: "text",
+            Qt.Key.Key_K: "label",
+            Qt.Key.Key_N: "counter",
+            Qt.Key.Key_U: "ruler",
+            Qt.Key.Key_I: "spotlight",
+            Qt.Key.Key_B: "blur",
+            Qt.Key.Key_G: "magnifier",
+            Qt.Key.Key_S: "shape",
+            Qt.Key.Key_E: "emoji",
+        }
+        if event.key() in tool_keys and not (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
+            self.tool_selected.emit(tool_keys[event.key()])
+            event.accept()
+            return
+
         if event.key() == Qt.Key.Key_Escape:
             # If a text item has focus, clear focus instead of closing
             focused = self.scene().focusItem()

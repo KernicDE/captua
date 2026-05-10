@@ -159,6 +159,7 @@ class OverlayWindow(QMainWindow):
         self._toolbar.magnifier_zoom_changed.connect(self._update_magnifier_zoom)
 
         self._view.tool_finished.connect(lambda: self._set_tool("select"))
+        self._view.tool_selected.connect(self._set_tool)
         self._scene.selectionChanged.connect(self._on_selection_changed)
         self._scene.sceneRectChanged.connect(self._on_scene_rect_changed)
         self._scene.scene_rect_fitted.connect(self._on_scene_rect_fitted)
