@@ -187,6 +187,9 @@ if [ -d "${PYSIDE6_DIR}" ]; then
         done
         # Remove specific plugins that depend on removed Qt libs
         rm -f "${PYSIDE6_DIR}/Qt/plugins/imageformats/libqpdf.so"
+        # Remove embedded/embedded platforms we don't need on desktop
+        rm -f "${PYSIDE6_DIR}/Qt/plugins/platforms/libqeglfs.so"
+        rm -f "${PYSIDE6_DIR}/Qt/plugins/platforms/libqminimalegl.so"
     fi
 
     # Remove unnecessary Qt libraries in Qt/lib/ that have missing system deps
