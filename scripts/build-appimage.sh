@@ -164,13 +164,20 @@ if [ -d "${PYSIDE6_DIR}" ]; then
     rm -rf "${PYSIDE6_DIR}/Qt/resources"
     rm -rf "${PYSIDE6_DIR}/include"
 
-    # Remove Qt plugin directories with missing system deps
+    # Remove Qt plugin directories with missing system deps.
+    # Keep only: platforms, platformthemes, xcbglintegrations, wayland*,
+    #            imageformats, iconengines, styles, accessibility.
     if [ -d "${PYSIDE6_DIR}/Qt/plugins" ]; then
-        for plugin_dir in texttospeech gamepads geoservices mediaservice \
-                          playlistformats printsupport sceneparsers \
-                          sensorgestures sensors sqldrivers virtualkeyboard \
-                          webview bearer audio position egldeviceintegrations; do
-            rm -rf "${PYSIDE6_DIR}/Qt/plugins/${plugin_dir}"
+        for plugin_dir in "${PYSIDE6_DIR}/Qt/plugins"/*; do
+            [ -d "${plugin_dir}" ] || continue
+            basename=$(basename "${plugin_dir}")
+            case "${basename}" in
+                platforms|platformthemes|xcbglintegrations|wayland*|imageformats|iconengines|styles|accessibility)
+                    ;;
+                *)
+                    rm -rf "${plugin_dir}"
+                    ;;
+            esac
         done
     fi
 fi
