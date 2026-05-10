@@ -180,6 +180,21 @@ if [ -d "${PYSIDE6_DIR}" ]; then
             esac
         done
     fi
+
+    # Remove unnecessary Qt libraries in Qt/lib/ that have missing system deps
+    if [ -d "${PYSIDE6_DIR}/Qt/lib" ]; then
+        for f in "${PYSIDE6_DIR}/Qt/lib"/*.so*; do
+            [ -e "${f}" ] || continue
+            basename=$(basename "${f}")
+            case "${basename}" in
+                libQt6Core.so*|libQt6Gui.so*|libQt6Widgets.so*|libQt6DBus.so*|libQt6OpenGL.so*|libicui18n.so*|libicuuc.so*|libicudata.so*)
+                    ;;
+                *)
+                    rm -f "${f}"
+                    ;;
+            esac
+        done
+    fi
 fi
 
 echo "=== Running linuxdeploy ==="
