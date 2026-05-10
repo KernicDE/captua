@@ -117,6 +117,51 @@ if [ -d "${PILLOW_LIBS}" ]; then
     export LD_LIBRARY_PATH="${PILLOW_LIBS}:${LD_LIBRARY_PATH}"
 fi
 
+# Remove unnecessary PySide6 modules and Qt tools to avoid linuxdeploy
+# scanning ELF files with missing system dependencies (libpcsclite, libpulse, etc.)
+echo "=== Removing unnecessary PySide6 modules ==="
+PYSIDE6_DIR="${SITE_PACKAGES}/PySide6"
+if [ -d "${PYSIDE6_DIR}" ]; then
+    # Keep only essential .abi3.so files; QtNetwork/QtDBus are often needed indirectly
+    for f in "${PYSIDE6_DIR}"/*.abi3.so; do
+        [ -e "${f}" ] || continue
+        basename=$(basename "${f}")
+        case "${basename}" in
+            QtCore.abi3.so|QtGui.abi3.so|QtWidgets.abi3.so|QtNetwork.abi3.so|QtDBus.abi3.so)
+                ;;
+            *)
+                rm -f "${f}"
+                ;;
+        esac
+    done
+
+    # Remove Qt tools and extra executables that pull in many Qt libs
+    for tool in designer linguist lrelease lupdate qml qmlcachegen qmlimportscanner \
+                balsam qmllint qmleasing qmlprofiler qmltestrunner qt-cmake \
+                qt-configure-module qtpaths qtplugininfo pixeltool; do
+        rm -f "${PYSIDE6_DIR}/${tool}"
+    done
+
+    # Remove other .so files in PySide6 root except libpyside6
+    for f in "${PYSIDE6_DIR}"/*.so*; do
+        [ -e "${f}" ] || continue
+        basename=$(basename "${f}")
+        case "${basename}" in
+            libpyside6*)
+                ;;
+            *)
+                rm -f "${f}"
+                ;;
+        esac
+    done
+
+    # Remove Qt subdirectories we don't need
+    rm -rf "${PYSIDE6_DIR}/Qt/qml"
+    rm -rf "${PYSIDE6_DIR}/Qt/translations"
+    rm -rf "${PYSIDE6_DIR}/Qt/resources"
+    rm -rf "${PYSIDE6_DIR}/include"
+fi
+
 echo "=== Running linuxdeploy ==="
 # AppImages need libfuse2 to run; if it's missing, extract and run
 export APPIMAGE_EXTRACT_AND_RUN=1
