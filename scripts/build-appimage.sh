@@ -137,7 +137,7 @@ if [ -d "${PYSIDE6_DIR}" ]; then
 
     # Remove Qt tools and extra executables that pull in many Qt libs
     for tool in designer linguist lrelease lupdate qml qmlcachegen qmlimportscanner \
-                balsam qmllint qmleasing qmlprofiler qmltestrunner qt-cmake \
+                balsam balsamui qmllint qmleasing qmlprofiler qmltestrunner qt-cmake \
                 qt-configure-module qtpaths qtplugininfo pixeltool; do
         rm -f "${PYSIDE6_DIR}/${tool}"
     done
