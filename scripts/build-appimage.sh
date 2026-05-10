@@ -169,7 +169,7 @@ if [ -d "${PYSIDE6_DIR}" ]; then
         for plugin_dir in texttospeech gamepads geoservices mediaservice \
                           playlistformats printsupport sceneparsers \
                           sensorgestures sensors sqldrivers virtualkeyboard \
-                          webview bearer audio position; do
+                          webview bearer audio position egldeviceintegrations; do
             rm -rf "${PYSIDE6_DIR}/Qt/plugins/${plugin_dir}"
         done
     fi
