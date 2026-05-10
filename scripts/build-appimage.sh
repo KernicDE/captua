@@ -155,11 +155,24 @@ if [ -d "${PYSIDE6_DIR}" ]; then
         esac
     done
 
+    # Remove Qt libexec tools
+    rm -rf "${PYSIDE6_DIR}/Qt/libexec"
+
     # Remove Qt subdirectories we don't need
     rm -rf "${PYSIDE6_DIR}/Qt/qml"
     rm -rf "${PYSIDE6_DIR}/Qt/translations"
     rm -rf "${PYSIDE6_DIR}/Qt/resources"
     rm -rf "${PYSIDE6_DIR}/include"
+
+    # Remove Qt plugin directories with missing system deps
+    if [ -d "${PYSIDE6_DIR}/Qt/plugins" ]; then
+        for plugin_dir in texttospeech gamepads geoservices mediaservice \
+                          playlistformats printsupport sceneparsers \
+                          sensorgestures sensors sqldrivers virtualkeyboard \
+                          webview bearer audio position; do
+            rm -rf "${PYSIDE6_DIR}/Qt/plugins/${plugin_dir}"
+        done
+    fi
 fi
 
 echo "=== Running linuxdeploy ==="
