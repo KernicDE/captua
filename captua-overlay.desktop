@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Captua
+Comment=Screenshot annotation tool for Wayland
+Exec=captua
+Type=Application
+Terminal=false
+Icon=accessories-screenshot
+Categories=Graphics;Utility;

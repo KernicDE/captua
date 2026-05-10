@@ -1,0 +1,123 @@
+# Captua User Guide
+
+Captua is a fast, lightweight screenshot annotation tool for Linux / Wayland built with Qt6.
+
+## Installation
+
+Requires **Python 3.12+**, **PySide6**, **grim**, **slurp**, and **wl-clipboard**.
+
+```bash
+# Dependencies (Arch example)
+pacman -S python python-pyside6 grim slurp wl-clipboard
+
+# Run
+./run.sh
+```
+
+## Capture Modes
+
+| Mode | Command | Description |
+|---|---|---|
+| Region | `captua` (default) | Select a rectangle with slurp |
+| Screen | `captua --screen` / `-s` | Capture the full active screen |
+| Window | `captua --window` / `-w` | Capture the active Hyprland window |
+
+## Toolbar
+
+The top bar contains (left to right):
+
+- **✕** — Close the overlay (`Esc`)
+- **💾** — Save to file (`Ctrl+S`)
+- **📋** — Copy to clipboard (`Ctrl+C`)
+- **➕** — Import an image from disk
+- **📷** — Capture a new region and add it to the canvas
+- **⚙** — Backdrop settings (padding, color, corner radius)
+- **Line color / width** — Stroke appearance for shapes, lines, arrows, etc.
+- **Fill color / opacity** — Fill appearance for closed shapes
+- **Tool buttons** — See table below
+
+## Tools
+
+| Tool | Shortcut | Description |
+|---|---|---|
+| 🖱 Mouse | `V` | Select, move, and resize items |
+| ▭ Square | `R` | Rectangle with optional fill |
+| ○ Circle | `O` | Ellipse with optional fill |
+| ╱ Line | `L` | Straight line |
+| ➜ Arrow | `A` | Arrow with adjustable stroke |
+| ✎ Pen | `P` | Freehand drawing |
+| 🖍 Marker | `M` | Thick highlighter stroke |
+| ⬟ Forms | `S` | Shapes (heart, star, etc.) |
+| 😀 Emojis | `E` | Emoji picker |
+| T Text | `T` | Click to place editable text |
+| 🏷 Label | `K` | Callout label with a leader line |
+| ① Numbering | `N` | Auto-incrementing counter badges |
+| 📏 Ruler | `U` | Measurement line with distance label |
+| 🔦 Highlight | `I` | Spotlight / dim overlay |
+| 🌫 Blur | `B` | Blur region (privacy) |
+| 🔍 Magnifier | `G` | Loupe that zooms part of the image |
+
+### Selection Editing
+
+When a single item is selected, the toolbar shows that item's properties. Changing a property updates the selected item in real time.
+
+- **Line color** — Stroke / border color
+- **Line width** — Stroke thickness (1–20 px)
+- **Fill color** — Interior color
+- **Fill opacity** — 0% (transparent) to 100% (solid)
+
+### Resize Handles
+
+In Mouse mode, blue corner handles appear on rectangle-based items. Drag a handle to resize.
+
+## Layer Ordering
+
+Select an item and press:
+
+- **PgUp** — Bring forward
+- **PgDn** — Send backward
+
+## Importing Images
+
+Three ways to add images to the canvas:
+
+1. **Toolbar ➕** — Open a file dialog
+2. **Drag & drop** — Drop an image file onto the canvas
+3. **Ctrl+V** — Paste from clipboard
+
+Images are selectable and movable once placed.
+
+## Backdrop Settings
+
+Click **⚙** to configure the background behind your screenshots:
+
+- **Backdrop padding** — Space between images and backdrop edge
+- **Backdrop color** — Solid fill color
+- **Use gradient** — Diagonal gradient between two colors
+- **Canvas rounding** — Corner radius for screenshot images
+- **Backdrop rounding** — Corner radius for the backdrop rectangle
+
+Changes are previewed live. Settings persist between sessions.
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Esc` | Close overlay (or clear text focus) |
+| `Ctrl+S` | Save to file |
+| `Ctrl+C` | Copy to clipboard |
+| `Ctrl+V` | Paste image from clipboard |
+| `Ctrl+Z` | Undo |
+| `Ctrl+Shift+Z` | Redo |
+| `Ctrl+Y` | Redo |
+| `Delete` / `Backspace` | Remove selected items |
+| `PgUp` / `PgDn` | Change layer order |
+| `Middle-drag` | Pan the canvas |
+| `Ctrl+Scroll` | Zoom in / out |
+
+## Tips
+
+- After drawing any annotation, the tool automatically switches back to **Mouse** mode so you can reposition it immediately.
+- The canvas auto-expands when you drag items beyond the current boundary; the window grows to match.
+- Use **Undo** liberally — the full history is kept in memory for the session.
+- The checkerboard pattern behind the canvas is only visible in the editor; it is **not** included in saved or copied images.
