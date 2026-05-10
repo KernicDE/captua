@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGraphicsPixmapItem,
     QGraphicsScene,
+    QGraphicsTextItem,
     QGraphicsView,
 )
 
@@ -497,6 +498,15 @@ class CanvasView(QGraphicsView):
             event.ignore()
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
+        # When a text item is being edited, let it handle all keys — don't
+        # intercept tool shortcuts like R, T, etc.
+        scene = self.scene()
+        if scene is not None:
+            focused = scene.focusItem()
+            if isinstance(focused, QGraphicsTextItem):
+                super().keyPressEvent(event)
+                return
+
         # Tool shortcuts — mirror the toolbar so they work when the canvas has focus
         tool_keys = {
             Qt.Key.Key_V: "select",
