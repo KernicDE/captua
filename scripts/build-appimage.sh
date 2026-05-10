@@ -142,12 +142,12 @@ if [ -d "${PYSIDE6_DIR}" ]; then
         rm -f "${PYSIDE6_DIR}/${tool}"
     done
 
-    # Remove other .so files in PySide6 root except libpyside6
+    # Remove other .so files in PySide6 root except libpyside6 (not libpyside6qml)
     for f in "${PYSIDE6_DIR}"/*.so*; do
         [ -e "${f}" ] || continue
         basename=$(basename "${f}")
         case "${basename}" in
-            libpyside6*)
+            libpyside6.abi3.so*)
                 ;;
             *)
                 rm -f "${f}"
