@@ -22,6 +22,18 @@ def main() -> int:
     app.setDesktopFileName("captua-overlay")
     app.setFont(QFont("Inter", 10))
 
+    # Global tooltip style — bright text on dark background so tooltips are readable
+    app.setStyleSheet("""
+        QToolTip {
+            background-color: #2A2A37;
+            color: #DCD7BA;
+            border: 1px solid #54546D;
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    """)
+
     # Choose capture mode from CLI args
     capture_mode = "region"
     if len(sys.argv) > 1:
