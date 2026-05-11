@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 
+from .items import _emoji_font_family
+
 _SHAPE_ICONS = [
     ("heart", "♥"),
     ("star5", "★"),
@@ -170,7 +172,7 @@ class EmojiPopup(QWidget):
         self._view.setSelectionMode(QListView.SelectionMode.SingleSelection)
         self._view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        font = QFont("Noto Color Emoji", 20)
+        font = QFont(_emoji_font_family(), 20)
         self._view.setFont(font)
 
         self._view.setStyleSheet("""
