@@ -5,15 +5,13 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QCursor, QPixmap
+from PySide6.QtWidgets import QApplication
 
 
 def _set_dpr(pixmap: QPixmap) -> QPixmap:
     """Apply the device-pixel-ratio of the screen under the cursor."""
     try:
-        from PySide6.QtGui import QCursor
-        from PySide6.QtWidgets import QApplication
-
         cursor_pos = QCursor.pos()
         for screen in QApplication.screens():
             if screen.geometry().contains(cursor_pos):
@@ -90,7 +88,10 @@ def capture_window() -> QPixmap:
     if result.returncode != 0:
         raise RuntimeError(f"hyprctl failed: {result.stderr}")
 
-    data = json.loads(result.stdout)
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"hyprctl returned invalid JSON: {result.stdout!r}") from exc
     at = data.get("at", [0, 0])
     size = data.get("size", [0, 0])
     scale = data.get("scale", 1.0)
