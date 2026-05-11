@@ -4,7 +4,7 @@ Captua is a fast, lightweight screenshot annotation tool for Linux / Wayland bui
 
 ## Installation
 
-Requires **Python 3.12+**, **PySide6**, **grim**, **slurp**, and **wl-clipboard**.
+Requires **Python 3.11+**, **PySide6**, **grim**, **slurp**, and **wl-clipboard**.
 
 ```bash
 # Dependencies (Arch example)

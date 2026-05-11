@@ -25,7 +25,7 @@ pyproject.toml      # Project config
 ```
 
 ## Tech Stack
-- Python 3.12+
+- Python 3.11+
 - PySide6 (Qt6)
 - grim, slurp, wl-clipboard (system deps)
 
@@ -40,7 +40,7 @@ pyproject.toml      # Project config
 
 ## Key Behaviours
 - **Backdrop in exports**: `OverlayWindow.render_to_pixmap()` computes `itemsBoundingRect()`, draws the backdrop via `draw_backdrop()`, then renders scene items on top.
-- **Window auto-resize**: `sceneRectChanged` is connected to `_resize_for_scene()`, which grows (never shrinks) the window to fit content, capped at 90% of screen.
+- **Window auto-resize**: `CanvasScene` emits `scene_rect_fitted` when items expand the scene; `OverlayWindow._on_scene_rect_fitted()` grows (never shrinks) the window to fit content, capped at 90% of screen. (`sceneRectChanged` is connected but its handler is a no-op.)
 - **Auto-switch to select**: `CanvasView` emits `tool_finished` after non-select tools complete; `OverlayWindow` switches back to select mode.
 - **Checkerboard not exported**: The checkerboard is drawn in `drawBackground()` but is intentionally skipped in `render_to_pixmap()`.
 
