@@ -20,9 +20,6 @@ pip install -e .
 
 # Run directly
 python3 -m captua.main [--screen | -s | --window | -w]
-
-# Type-check
-mypy captua/
 ```
 
 No linter config. Type-check with `mypy captua/`. Run tests:
