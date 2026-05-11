@@ -180,7 +180,7 @@ class CanvasView(QGraphicsView):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.horizontalScrollBar().setStyleSheet("QScrollBar:horizontal { height: 0px; }")
         self.verticalScrollBar().setStyleSheet("QScrollBar:vertical { width: 0px; }")
-        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.SmartViewportUpdate)
         self.setAcceptDrops(True)
 
         scene.selectionChanged.connect(self.viewport().update)
