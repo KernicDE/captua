@@ -25,7 +25,18 @@ python3 -m captua.main [--screen | -s | --window | -w]
 mypy captua/
 ```
 
-No test suite exists yet. No linter config.
+No linter config. Type-check with `mypy captua/`. Run tests:
+
+```bash
+# Install with dev deps
+pip install -e ".[dev]"
+
+# Run all tests
+pytest
+
+# Run a single test file
+pytest tests/test_history.py -v
+```
 
 ## Architecture
 
