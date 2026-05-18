@@ -1,7 +1,7 @@
 """Toolbar and properties bar."""
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QKeyEvent
+from PySide6.QtGui import QColor, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -10,33 +10,54 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSlider,
+    QVBoxLayout,
     QWidget,
 )
 
+from .icons import icon
 from .popups import EmojiPopup, MagnifierPopup, ShapePopup
 
 _TOOL_BTN_STYLE = """
     QPushButton {
-        background-color: #2A2A37;
-        color: #DCD7BA;
-        border: 1px solid #54546D;
-        border-radius: 6px;
+        background-color: #27272A;
+        color: #A1A1AA;
+        border: 1px solid #3F3F46;
+        border-radius: 8px;
         font-size: 14px;
     }
     QPushButton:hover {
-        background-color: #363646;
-        border: 1px solid #727169;
+        background-color: #3F3F46;
+        border: 1px solid #52525B;
+        color: #F4F4F5;
     }
     QPushButton:pressed {
-        background-color: #54546D;
+        background-color: #52525B;
+    }
+"""
+
+_ACTION_BTN_STYLE = """
+    QPushButton {
+        background-color: transparent;
+        color: #A1A1AA;
+        border: none;
+        border-radius: 6px;
+        font-size: 13px;
+        padding: 2px 8px;
+    }
+    QPushButton:hover {
+        background-color: #3F3F46;
+        color: #F4F4F5;
+    }
+    QPushButton:pressed {
+        background-color: #52525B;
     }
 """
 
 _EDIT_STYLE = """
     QLineEdit {
-        background-color: #2A2A37;
-        color: #DCD7BA;
-        border: 1px solid #54546D;
+        background-color: #27272A;
+        color: #F4F4F5;
+        border: 1px solid #3F3F46;
         border-radius: 4px;
         padding: 0 2px;
         font-size: 12px;
@@ -51,25 +72,36 @@ def _make_separator() -> QFrame:
     sep = QFrame()
     sep.setFrameShape(QFrame.Shape.VLine)
     sep.setFixedWidth(1)
-    sep.setStyleSheet("QFrame { background-color: #54546D; border: none; }")
+    sep.setStyleSheet("QFrame { background-color: #3F3F46; border: none; }")
     return sep
 
 
 class ToolButton(QPushButton):
-    """Single tool button with active state styling."""
+    """Single tool button with active state styling and a crisp icon."""
 
-    def __init__(self, icon: str, name: str, shortcut: str, parent=None) -> None:
-        super().__init__(icon, parent)
+    def __init__(self, icon_name: str, name: str, shortcut: str, parent=None) -> None:
+        super().__init__(parent)
+        self._icon_name = icon_name
         self.setCheckable(True)
         self.setFixedSize(32, 32)
         self.setStyleSheet(_TOOL_BTN_STYLE + """
             QPushButton:checked {
                 background-color: #2D4F67;
                 border: 1px solid #7E9CD8;
-                color: #DCD7BA;
+                color: #F4F4F5;
             }
         """)
         self.setToolTip(f"{name} ({shortcut})")
+        self._update_icon()
+
+    def _update_icon(self) -> None:
+        pm = icon(self._icon_name, active=self.isChecked())
+        self.setIcon(pm)
+        self.setIconSize(pm.size())
+
+    def nextCheckState(self) -> None:
+        super().nextCheckState()
+        self._update_icon()
 
 
 class ColorSwatch(QPushButton):
@@ -90,11 +122,11 @@ class ColorSwatch(QPushButton):
         self.setStyleSheet(f"""
             QPushButton {{
                 background-color: {c};
-                border: 2px solid #727169;
-                border-radius: 14px;
+                border: 2px solid #71717A;
+                border-radius: 12px;
             }}
             QPushButton:hover {{
-                border: 2px solid #DCD7BA;
+                border: 2px solid #F4F4F5;
             }}
         """)
 
@@ -115,7 +147,7 @@ class ColorSwatch(QPushButton):
 
 
 class Toolbar(QWidget):
-    """Top toolbar with tool buttons and property controls."""
+    """Top toolbar with action buttons, tool buttons and property controls."""
 
     tool_changed = Signal(str)
     line_color_changed = Signal(QColor)
@@ -134,67 +166,122 @@ class Toolbar(QWidget):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setFixedHeight(44)
-        self.setStyleSheet("background-color: #16161D;")
+        self.setFixedHeight(76)
+        self.setStyleSheet("background-color: #18181B;")
 
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(6, 4, 6, 4)
-        layout.setSpacing(2)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(6, 4, 6, 4)
+        main_layout.setSpacing(4)
 
-        # ---- left: action buttons -----------------------------------------------
+        # ---- top row: action buttons ------------------------------------------
+        action_row = QHBoxLayout()
+        action_row.setSpacing(4)
+
         has_frameless = False
         if parent is not None:
             has_frameless = bool(parent.windowFlags() & Qt.WindowType.FramelessWindowHint)
 
         if has_frameless:
             self._close_btn = QPushButton("✕")
-            self._close_btn.setFixedSize(36, 36)
-            self._close_btn.setStyleSheet(_TOOL_BTN_STYLE)
+            self._close_btn.setFixedSize(32, 28)
+            self._close_btn.setStyleSheet(_ACTION_BTN_STYLE)
             self._close_btn.setToolTip("Close (Esc)")
-            layout.addWidget(self._close_btn)
+            action_row.addWidget(self._close_btn)
             self._close_btn.clicked.connect(self.close_triggered.emit)
         else:
             self._close_btn = None
 
-        self._save_btn = QPushButton("💾")
-        self._save_btn.setFixedSize(36, 36)
-        self._save_btn.setStyleSheet(_TOOL_BTN_STYLE)
+        self._save_btn = QPushButton("Save")
+        self._save_btn.setFixedSize(48, 28)
+        self._save_btn.setStyleSheet(_ACTION_BTN_STYLE)
         self._save_btn.setToolTip("Save (Ctrl+S)")
-        layout.addWidget(self._save_btn)
+        action_row.addWidget(self._save_btn)
         self._save_btn.clicked.connect(self.save_triggered.emit)
 
-        self._copy_btn = QPushButton("📋")
-        self._copy_btn.setFixedSize(36, 36)
-        self._copy_btn.setStyleSheet(_TOOL_BTN_STYLE)
-        self._copy_btn.setToolTip("Copy to clipboard (Ctrl+C)")
-        layout.addWidget(self._copy_btn)
+        self._copy_btn = QPushButton("Copy")
+        self._copy_btn.setFixedSize(48, 28)
+        self._copy_btn.setStyleSheet(_ACTION_BTN_STYLE)
+        self._copy_btn.setToolTip("Copy & save (Ctrl+C)")
+        action_row.addWidget(self._copy_btn)
         self._copy_btn.clicked.connect(self.copy_triggered.emit)
 
-        self._import_btn = QPushButton("➕")
-        self._import_btn.setFixedSize(36, 36)
-        self._import_btn.setStyleSheet(_TOOL_BTN_STYLE)
+        self._import_btn = QPushButton("Import")
+        self._import_btn.setFixedSize(52, 28)
+        self._import_btn.setStyleSheet(_ACTION_BTN_STYLE)
         self._import_btn.setToolTip("Import image")
-        layout.addWidget(self._import_btn)
+        action_row.addWidget(self._import_btn)
         self._import_btn.clicked.connect(self.import_image_triggered.emit)
 
-        self._capture_btn = QPushButton("📷")
-        self._capture_btn.setFixedSize(36, 36)
-        self._capture_btn.setStyleSheet(_TOOL_BTN_STYLE)
+        self._capture_btn = QPushButton("Capture")
+        self._capture_btn.setFixedSize(56, 28)
+        self._capture_btn.setStyleSheet(_ACTION_BTN_STYLE)
         self._capture_btn.setToolTip("Capture region")
-        layout.addWidget(self._capture_btn)
+        action_row.addWidget(self._capture_btn)
         self._capture_btn.clicked.connect(self.capture_triggered.emit)
 
-        # ---- property group (colour/stroke) ------------------------------------
-        layout.addSpacing(8)
-        layout.addWidget(_make_separator())
-        layout.addSpacing(8)
+        action_row.addWidget(_make_separator())
+
+        # Backdrop button (non-tool, shows popup)
+        self._backdrop_btn = QPushButton("Backdrop")
+        self._backdrop_btn.setFixedSize(64, 28)
+        self._backdrop_btn.setStyleSheet(_ACTION_BTN_STYLE)
+        self._backdrop_btn.setToolTip("Backdrop settings")
+        self._backdrop_btn.clicked.connect(self.backdrop_settings_triggered.emit)
+        action_row.addWidget(self._backdrop_btn)
+
+        action_row.addStretch()
+        main_layout.addLayout(action_row)
+
+        # ---- bottom row: tools + properties -----------------------------------
+        bottom_row = QHBoxLayout()
+        bottom_row.setSpacing(4)
+
+        # Tool buttons
+        self._buttons: dict[str, ToolButton] = {}
+        self._active = "select"
+
+        tools = [
+            ("select",    "V", "select",  "Mouse"),
+            ("rectangle", "R", "rectangle",  "Rectangle"),
+            ("ellipse",   "O", "ellipse",  "Ellipse"),
+            ("line",      "L", "line",  "Line"),
+            ("arrow",     "A", "arrow",  "Arrow"),
+            ("pen",       "P", "pen",  "Pen"),
+            ("marker",    "M", "marker",  "Marker"),
+            ("shape",     "S", "shape",  "Forms"),
+            ("emoji",     "E", "emoji", "Emojis"),
+            ("text",      "T", "text",   "Text"),
+            ("label",     "K", "label",  "Label"),
+            ("counter",   "N", "counter",  "Numbering"),
+            ("ruler",     "U", "ruler",  "Ruler"),
+            ("spotlight", "I", "spotlight",  "Highlight"),
+            ("blur",      "B", "blur",  "Blur"),
+            ("magnifier", "G", "magnifier",  "Magnifier"),
+        ]
+
+        for key, sc, icon_name, name in tools:
+            btn = ToolButton(icon_name, name, sc)
+            btn.clicked.connect(lambda checked, k=key: self._on_tool_clicked(k))
+            self._buttons[key] = btn
+            bottom_row.addWidget(btn)
+
+        self._buttons["select"].setChecked(True)
+
+        bottom_row.addWidget(_make_separator())
+
+        # Properties panel (contextual)
+        self._props_widget = QWidget(self)
+        self._props_widget.setStyleSheet("background: transparent;")
+        props_layout = QHBoxLayout(self._props_widget)
+        props_layout.setContentsMargins(0, 0, 0, 0)
+        props_layout.setSpacing(4)
 
         # Line color + width
         self._line_color_btn = ColorSwatch()
         self._line_color_btn.color_changed.connect(self.line_color_changed.emit)
-        layout.addWidget(self._line_color_btn)
+        props_layout.addWidget(self._line_color_btn)
 
-        layout.addSpacing(4)
+        props_layout.addSpacing(4)
 
         self._line_width_slider = QSlider(Qt.Orientation.Horizontal)
         self._line_width_slider.setRange(1, 20)
@@ -204,7 +291,7 @@ class Toolbar(QWidget):
             QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         )
         self._line_width_slider.valueChanged.connect(self._on_line_width_changed)
-        layout.addWidget(self._line_width_slider)
+        props_layout.addWidget(self._line_width_slider)
 
         self._line_width_edit = QLineEdit("3")
         self._line_width_edit.setFixedWidth(32)
@@ -214,17 +301,17 @@ class Toolbar(QWidget):
             QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         )
         self._line_width_edit.editingFinished.connect(self._on_line_width_edit_changed)
-        layout.addWidget(self._line_width_edit)
+        props_layout.addWidget(self._line_width_edit)
         self._on_line_width_changed(3)
 
-        layout.addSpacing(8)
+        props_layout.addSpacing(8)
 
         # Fill color + alpha
         self._fill_color_btn = ColorSwatch()
         self._fill_color_btn.color_changed.connect(self.fill_color_changed.emit)
-        layout.addWidget(self._fill_color_btn)
+        props_layout.addWidget(self._fill_color_btn)
 
-        layout.addSpacing(4)
+        props_layout.addSpacing(4)
 
         self._fill_alpha_slider = QSlider(Qt.Orientation.Horizontal)
         self._fill_alpha_slider.setRange(0, 100)
@@ -234,7 +321,7 @@ class Toolbar(QWidget):
             QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         )
         self._fill_alpha_slider.valueChanged.connect(self._on_fill_alpha_changed)
-        layout.addWidget(self._fill_alpha_slider)
+        props_layout.addWidget(self._fill_alpha_slider)
 
         self._fill_alpha_edit = QLineEdit("50%")
         self._fill_alpha_edit.setFixedWidth(40)
@@ -244,59 +331,18 @@ class Toolbar(QWidget):
             QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         )
         self._fill_alpha_edit.editingFinished.connect(self._on_fill_alpha_edit_changed)
-        layout.addWidget(self._fill_alpha_edit)
+        props_layout.addWidget(self._fill_alpha_edit)
         self._on_fill_alpha_changed(50)
 
-        layout.addSpacing(8)
-        layout.addWidget(_make_separator())
-        layout.addSpacing(8)
-
-        # ---- tool buttons -------------------------------------------------------
-        self._buttons: dict[str, ToolButton] = {}
-        self._active = "select"
-
-        tools = [
-            ("select",    "V", "🖱",  "Mouse"),
-            ("rectangle", "R", "▭",  "Rectangle"),
-            ("ellipse",   "O", "○",  "Ellipse"),
-            ("line",      "L", "╱",  "Line"),
-            ("arrow",     "A", "➜",  "Arrow"),
-            ("pen",       "P", "✎",  "Pen"),
-            ("marker",    "M", "🖍",  "Marker"),
-            ("shape",     "S", "⬟",  "Forms"),
-            ("emoji",     "E", "😀", "Emojis"),
-            ("text",      "T", "T",   "Text"),
-            ("label",     "K", "🏷",  "Label"),
-            ("counter",   "N", "①",  "Numbering"),
-            ("ruler",     "U", "📏",  "Ruler"),
-            ("spotlight", "I", "🔦",  "Highlight"),
-            ("blur",      "B", "🌫",  "Blur"),
-            ("magnifier", "G", "🔍",  "Magnifier"),
-        ]
-
-        for key, sc, icon, name in tools:
-            btn = ToolButton(icon, name, sc)
-            btn.clicked.connect(lambda checked, k=key: self._on_tool_clicked(k))
-            self._buttons[key] = btn
-            layout.addWidget(btn)
-
-        self._buttons["select"].setChecked(True)
-
-        # Backdrop button (non-tool, shows popup)
-        self._backdrop_btn = QPushButton("🖼️")
-        self._backdrop_btn.setFixedSize(32, 32)
-        self._backdrop_btn.setStyleSheet(_TOOL_BTN_STYLE)
-        self._backdrop_btn.setToolTip("Backdrop-Einstellungen")
-        self._backdrop_btn.clicked.connect(self.backdrop_settings_triggered.emit)
-        layout.addWidget(self._backdrop_btn)
+        bottom_row.addWidget(self._props_widget)
+        bottom_row.addStretch()
+        main_layout.addLayout(bottom_row)
 
         # Popups (lazy)
         self._shape_popup: ShapePopup | None = None
         self._emoji_popup: EmojiPopup | None = None
         self._mag_zoom_popup: MagnifierPopup | None = None
         self._current_mag_zoom: float = 2.0
-
-        layout.addStretch()
 
         # Enforce minimum width so the window can't be narrowed below content
         self.layout().activate()
@@ -310,6 +356,7 @@ class Toolbar(QWidget):
             self._active = key
             for k, btn in self._buttons.items():
                 btn.setChecked(k == key)
+                btn._update_icon()
             self.tool_changed.emit(key)
 
         if key == "shape":
@@ -387,6 +434,13 @@ class Toolbar(QWidget):
         self._active = key
         for k, btn in self._buttons.items():
             btn.setChecked(k == key)
+            btn._update_icon()
+
+    def active_tool(self) -> str:
+        return self._active
+
+    def set_properties_visible(self, visible: bool) -> None:
+        self._props_widget.setVisible(visible)
 
     # -- change handlers -------------------------------------------------------
 

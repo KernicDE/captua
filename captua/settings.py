@@ -22,6 +22,9 @@ def _default_settings() -> dict:
         "line_width": 3,
         "fill_color": "#FF5D62",
         "fill_alpha": 128,
+        "auto_save_on_copy": True,
+        "screenshots_folder": "~/Pictures/Screenshots",
+        "screenshot_filename_template": "captua-{timestamp}.png",
     }
 
 

@@ -3,14 +3,19 @@
 # Pixels of checkerboard visible around the scene/backdrop when the window opens.
 _VIEWPORT_MARGIN = 50
 
-from PySide6.QtCore import QPointF, QRectF, Qt
+from datetime import datetime
+from pathlib import Path
+
+from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QFrame,
     QGraphicsPixmapItem,
+    QLabel,
     QMainWindow,
+    QMessageBox,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -49,7 +54,7 @@ class ToolbarScrollArea(QScrollArea):
         super().__init__(parent)
         self.setWidget(toolbar)
         self.setWidgetResizable(False)
-        self.setFixedHeight(44)
+        self.setFixedHeight(80)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setFrameShape(QFrame.Shape.NoFrame)
@@ -81,8 +86,8 @@ class OverlayWindow(QMainWindow):
             | Qt.WindowType.WindowStaysOnTopHint
         )
 
-        # Background colour (dark, like Shottr)
-        self.setStyleSheet("background-color: #1F1F28;")
+        # Background colour (dark, modern)
+        self.setStyleSheet("background-color: #18181B;")
         self.setAcceptDrops(True)
 
         # Central widget with vertical layout
@@ -98,6 +103,14 @@ class OverlayWindow(QMainWindow):
         layout.addWidget(self._toolbar_scroll)
         self.setMinimumWidth(self._toolbar.minimumSizeHint().width())
         self._backdrop_popup: BackdropPopup | None = None
+
+        # Toast label for ephemeral status messages
+        self._toast = QLabel(self)
+        self._toast.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._toast.setStyleSheet(
+            "background-color: #27272A; color: #F4F4F5; border-radius: 6px; padding: 6px 12px; font-size: 12px;"
+        )
+        self._toast.hide()
 
         # Canvas fills the rest of the window
         self._scene = CanvasScene(self)
@@ -168,6 +181,10 @@ class OverlayWindow(QMainWindow):
         tool = self._tools.get(name)
         self._view.set_active_tool(tool)
         self._toolbar.update_active_tool_button(name)
+        # Show/hide properties based on whether the tool needs them
+        self._toolbar.set_properties_visible(
+            name not in ("select", "crop", "counter", "magnifier", "emoji", "shape")
+        )
 
     def _update_line_color(self, color) -> None:
         self._props.color = color
@@ -204,6 +221,9 @@ class OverlayWindow(QMainWindow):
     def _on_selection_changed(self) -> None:
         items = [i for i in self._scene.selectedItems() if i is not self._scene.base_image()]
         if len(items) != 1:
+            self._toolbar.set_properties_visible(
+                self._toolbar.active_tool() not in ("select", "crop", "counter", "magnifier", "emoji", "shape")
+            )
             return
         item = items[0]
         if hasattr(item, "line_color"):
@@ -221,6 +241,7 @@ class OverlayWindow(QMainWindow):
         if hasattr(item, "zoom_level"):
             self._toolbar.set_magnifier_zoom(item.zoom_level())
             self._props.zoom_level = item.zoom_level()
+        self._toolbar.set_properties_visible(True)
 
     def _update_shape(self, shape_type: str) -> None:
         self._props.shape_type = shape_type
@@ -335,7 +356,7 @@ class OverlayWindow(QMainWindow):
         _, max_w, max_h = self._screen_constraints()
         scene_rect = self._scene.sceneRect()
         needed_w = int(scene_rect.width()) + _VIEWPORT_MARGIN * 2
-        needed_h = int(scene_rect.height()) + 44 + _VIEWPORT_MARGIN * 2
+        needed_h = int(scene_rect.height()) + 80 + _VIEWPORT_MARGIN * 2
         new_w = max(needed_w, self.minimumWidth())
         new_h = min(max(needed_h, 0), max_h)
         self.resize(new_w, new_h)
@@ -348,7 +369,7 @@ class OverlayWindow(QMainWindow):
         """Resize window to keep the new scene rect visible with checkerboard margin."""
         _, max_w, max_h = self._screen_constraints()
         needed_w = int(new_rect.width()) + _VIEWPORT_MARGIN * 2
-        needed_h = int(new_rect.height()) + 44 + _VIEWPORT_MARGIN * 2
+        needed_h = int(new_rect.height()) + 80 + _VIEWPORT_MARGIN * 2
         new_w = max(needed_w, self.minimumWidth())
         new_h = min(max(needed_h, 0), max_h)
         self.resize(new_w, new_h)
@@ -458,11 +479,60 @@ class OverlayWindow(QMainWindow):
                 painter.end()
         return pixmap
 
+    def _save_pixmap_auto(self, pixmap: QPixmap) -> Path | None:
+        """Save pixmap to the configured screenshots folder. Returns the path or None on failure."""
+        folder = Path(self._settings.get("screenshots_folder", "~/Pictures/Screenshots")).expanduser()
+        folder.mkdir(parents=True, exist_ok=True)
+
+        ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        template = self._settings.get("screenshot_filename_template", "captua-{timestamp}.png")
+        filename = template.replace("{timestamp}", ts).replace("{date}", datetime.now().strftime("%Y-%m-%d"))
+        path = folder / filename
+
+        if pixmap.save(str(path), "PNG"):
+            return path
+        return None
+
+    def _show_toast(self, message: str, duration_ms: int = 1500) -> None:
+        """Show a transient status label centered in the window."""
+        from PySide6.QtWidgets import QLabel
+        if self._toast is None:
+            self._toast = QLabel(self)
+            self._toast.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._toast.setStyleSheet(
+                "background-color: #27272A; color: #F4F4F5; border-radius: 6px; padding: 6px 12px; font-size: 12px;"
+            )
+        self._toast.setText(message)
+        self._toast.adjustSize()
+        x = (self.width() - self._toast.width()) // 2
+        y = self.height() - self._toast.height() - 20
+        self._toast.move(x, y)
+        self._toast.raise_()
+        self._toast.show()
+        QTimer.singleShot(duration_ms, self._toast.hide)
+
     def copy_to_clipboard(self) -> None:
-        """Render scene and copy to Wayland clipboard."""
-        from .capture import copy_pixmap_to_clipboard
+        """Render scene, copy to clipboard, auto-save, and optionally close."""
         pixmap = self.render_to_pixmap()
-        copy_pixmap_to_clipboard(pixmap)
+        clipboard = QApplication.clipboard()
+        if clipboard is not None:
+            clipboard.setPixmap(pixmap)
+
+        auto_save = self._settings.get("auto_save_on_copy", True)
+        if auto_save:
+            saved_path = self._save_pixmap_auto(pixmap)
+            if saved_path is not None:
+                self._show_toast(f"Saved to {saved_path.name}", 1200)
+                # Delay close so the toast is visible briefly
+                QTimer.singleShot(1400, self.close)
+            else:
+                QMessageBox.critical(
+                    self,
+                    "Save Failed",
+                    "Could not auto-save the screenshot. Please use Save As (Ctrl+S) instead.",
+                )
+        else:
+            self.close()
 
     def save_to_disk(self) -> None:
         """Render scene and save to a user-selected file."""
@@ -476,3 +546,4 @@ class OverlayWindow(QMainWindow):
         )
         if file_path:
             pixmap.save(file_path)
+

@@ -120,32 +120,32 @@ class _ColorDisc(QWidget):
 
 _DIALOG_STYLE = """
     QDialog {
-        background-color: #16161D;
+        background-color: #18181B;
     }
     QPushButton {
-        background-color: #2A2A37;
-        color: #DCD7BA;
-        border: 1px solid #54546D;
+        background-color: #27272A;
+        color: #F4F4F5;
+        border: 1px solid #3F3F46;
         border-radius: 6px;
         padding: 6px 12px;
         font-weight: bold;
     }
     QPushButton:hover {
-        background-color: #363646;
-        border: 1px solid #727169;
+        background-color: #3F3F46;
+        border: 1px solid #52525B;
     }
     QPushButton:pressed {
-        background-color: #54546D;
+        background-color: #52525B;
     }
     QSlider::groove:horizontal {
         height: 6px;
-        background: #54546D;
+        background: #3F3F46;
         border-radius: 3px;
     }
     QSlider::handle:horizontal {
         width: 14px;
         height: 14px;
-        background: #DCD7BA;
+        background: #F4F4F5;
         border-radius: 7px;
     }
 """
@@ -174,7 +174,7 @@ class ColorWheelDialog(QDialog):
         from PySide6.QtWidgets import QSlider
         sat_layout = QHBoxLayout()
         sat_label = QLabel("S:")
-        sat_label.setStyleSheet("color: #DCD7BA; font-weight: bold;")
+        sat_label.setStyleSheet("color: #F4F4F5; font-weight: bold;")
         sat_layout.addWidget(sat_label)
         self._sat_slider = QSlider(Qt.Orientation.Horizontal)
         self._sat_slider.setRange(0, 100)
@@ -183,7 +183,7 @@ class ColorWheelDialog(QDialog):
         self._sat_slider.valueChanged.connect(self._on_sat_changed)
         sat_layout.addWidget(self._sat_slider)
         self._sat_value = QLabel(f"{self._sat_slider.value()}%")
-        self._sat_value.setStyleSheet("color: #DCD7BA; min-width: 32px;")
+        self._sat_value.setStyleSheet("color: #F4F4F5; min-width: 32px;")
         sat_layout.addWidget(self._sat_value)
         layout.addLayout(sat_layout)
 
@@ -195,7 +195,7 @@ class ColorWheelDialog(QDialog):
         self._preview.setStyleSheet(f"""
             QLabel {{
                 background-color: {initial_color.name()};
-                border: 2px solid #727169;
+                border: 2px solid #71717A;
                 border-radius: 16px;
             }}
         """)
@@ -225,7 +225,7 @@ class ColorWheelDialog(QDialog):
         self._preview.setStyleSheet(f"""
             QLabel {{
                 background-color: {color.name()};
-                border: 2px solid #727169;
+                border: 2px solid #71717A;
                 border-radius: 16px;
             }}
         """)

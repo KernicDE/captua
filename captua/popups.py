@@ -89,21 +89,21 @@ class ShapePopup(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setStyleSheet("""
             QWidget {
-                background-color: #2A2A37;
-                border: 1px solid #727169;
+                background-color: #27272A;
+                border: 1px solid #3F3F46;
                 border-radius: 8px;
             }
             QPushButton {
-                background-color: #363646;
-                color: #DCD7BA;
-                border: 1px solid #727169;
+                background-color: #3F3F46;
+                color: #F4F4F5;
+                border: 1px solid #52525B;
                 border-radius: 6px;
                 padding: 4px;
                 font-size: 20px;
             }
             QPushButton:hover {
-                background-color: #54546D;
-                border: 1px solid #DCD7BA;
+                background-color: #52525B;
+                border: 1px solid #F4F4F5;
             }
             QPushButton:checked {
                 background-color: #2D4F67;
@@ -151,8 +151,8 @@ class EmojiPopup(QWidget):
         container = QFrame(self)
         container.setStyleSheet("""
             QFrame {
-                background-color: #2A2A37;
-                border: 1px solid #727169;
+                background-color: #27272A;
+                border: 1px solid #3F3F46;
                 border-radius: 8px;
             }
         """)
@@ -182,10 +182,10 @@ class EmojiPopup(QWidget):
             }
             QListView::item {
                 background-color: transparent;
-                color: #DCD7BA;
+                color: #F4F4F5;
             }
             QListView::item:hover {
-                background-color: #54546D;
+                background-color: #52525B;
                 border-radius: 4px;
             }
             QListView::item:selected {
@@ -235,17 +235,17 @@ class MagnifierPopup(QWidget):
         self.setFixedSize(180, 80)
         self.setStyleSheet("""
             QWidget {
-                background-color: #2A2A37;
-                border: 1px solid #727169;
+                background-color: #27272A;
+                border: 1px solid #3F3F46;
                 border-radius: 8px;
             }
             QLabel {
-                color: #DCD7BA;
+                color: #F4F4F5;
                 font-size: 12px;
             }
             QSlider::groove:horizontal {
                 height: 4px;
-                background: #727169;
+                background: #3F3F46;
                 border-radius: 2px;
             }
             QSlider::handle:horizontal {

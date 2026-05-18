@@ -17,18 +17,18 @@ from .toolbar import ColorSwatch
 
 _POPUP_STYLE = """
     QFrame#backdrop_frame {
-        background-color: #2A2A37;
-        border: 1px solid #727169;
+        background-color: #27272A;
+        border: 1px solid #3F3F46;
         border-radius: 8px;
     }
     QLabel {
-        color: #DCD7BA;
+        color: #F4F4F5;
         font-size: 12px;
         background: transparent;
         border: none;
     }
     QCheckBox {
-        color: #DCD7BA;
+        color: #F4F4F5;
         font-size: 12px;
         background: transparent;
         border: none;
@@ -37,8 +37,8 @@ _POPUP_STYLE = """
         width: 14px;
         height: 14px;
         border-radius: 3px;
-        border: 1px solid #727169;
-        background: #16161D;
+        border: 1px solid #3F3F46;
+        background: #18181B;
     }
     QCheckBox::indicator:checked {
         background: #7E9CD8;
@@ -46,7 +46,7 @@ _POPUP_STYLE = """
     }
     QSlider::groove:horizontal {
         height: 4px;
-        background: #54546D;
+        background: #3F3F46;
         border-radius: 2px;
     }
     QSlider::handle:horizontal {
@@ -93,10 +93,10 @@ class BackdropPopup(QWidget):
         # Solid backdrop color
         self._color_btn = ColorSwatch(QColor(scene.backdrop_color))
         self._color_btn.color_changed.connect(self._apply)
-        form.addRow("Farbe:", self._color_btn)
+        form.addRow("Colour:", self._color_btn)
 
         # Gradient toggle
-        self._gradient_check = QCheckBox("Verlauf verwenden")
+        self._gradient_check = QCheckBox("Use gradient")
         self._gradient_check.setChecked(scene.backdrop_use_gradient)
         self._gradient_check.stateChanged.connect(self._apply)
         form.addRow(self._gradient_check)
@@ -108,10 +108,10 @@ class BackdropPopup(QWidget):
         self._grad_start_btn.color_changed.connect(self._apply)
         self._grad_end_btn = ColorSwatch(QColor(scene.backdrop_gradient_end))
         self._grad_end_btn.color_changed.connect(self._apply)
-        grad_row.addWidget(QLabel("Von:"))
+        grad_row.addWidget(QLabel("From:"))
         grad_row.addWidget(self._grad_start_btn)
         grad_row.addSpacing(8)
-        grad_row.addWidget(QLabel("Bis:"))
+        grad_row.addWidget(QLabel("To:"))
         grad_row.addWidget(self._grad_end_btn)
         grad_row.addStretch()
         form.addRow(grad_row)
@@ -126,7 +126,7 @@ class BackdropPopup(QWidget):
         pad_row = QHBoxLayout()
         pad_row.addWidget(self._padding_slider)
         pad_row.addWidget(self._padding_label)
-        form.addRow("Abstand:", pad_row)
+        form.addRow("Padding:", pad_row)
 
         # Canvas corner radius
         images = scene.image_items()
@@ -140,7 +140,7 @@ class BackdropPopup(QWidget):
         cr_row = QHBoxLayout()
         cr_row.addWidget(self._canvas_radius_slider)
         cr_row.addWidget(self._canvas_radius_label)
-        form.addRow("Canvas-Rundung:", cr_row)
+        form.addRow("Canvas radius:", cr_row)
 
         # Backdrop corner radius
         bd_r = int(scene.backdrop_corner_radius)
@@ -153,7 +153,7 @@ class BackdropPopup(QWidget):
         br_row = QHBoxLayout()
         br_row.addWidget(self._backdrop_radius_slider)
         br_row.addWidget(self._backdrop_radius_label)
-        form.addRow("Backdrop-Rundung:", br_row)
+        form.addRow("Backdrop radius:", br_row)
 
         inner.addLayout(form)
 

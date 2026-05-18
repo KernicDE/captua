@@ -5,6 +5,7 @@ from PySide6.QtGui import (
     QColor,
     QDragEnterEvent,
     QDropEvent,
+    QFont,
     QKeyEvent,
     QLinearGradient,
     QMouseEvent,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
     QGraphicsScene,
     QGraphicsTextItem,
     QGraphicsView,
+    QLabel,
 )
 
 from .history import History, RemoveItemCommand
@@ -163,6 +165,10 @@ class CanvasView(QGraphicsView):
         self._glass_start_scene = None
         self._glass_dest_start = None
 
+        # Shortcut overlay
+        self._shortcut_overlay: QLabel | None = None
+        self._hint_shown = False
+
         self.setRenderHints(
             QPainter.RenderHint.Antialiasing
             | QPainter.RenderHint.SmoothPixmapTransform
@@ -218,8 +224,8 @@ class CanvasView(QGraphicsView):
     def drawBackground(self, painter: QPainter, rect) -> None:
         # 1. Checkerboard
         cell = 20
-        c1 = QColor("#363646")
-        c2 = QColor("#2A2A37")
+        c1 = QColor("#27272A")
+        c2 = QColor("#18181B")
         x_start = int(rect.left()) // cell * cell
         y_start = int(rect.top()) // cell * cell
         for y in range(y_start, int(rect.bottom()) + cell, cell):
@@ -327,8 +333,9 @@ class CanvasView(QGraphicsView):
         scale = self.transform().m11()
         handle_size = max(8 / scale, 2)
         pen_width = max(1 / scale, 0.5)
+        # White handle with accent border for better contrast
         painter.setPen(QPen(QColor("#7E9CD8"), pen_width))
-        painter.setBrush(QColor("#7E9CD8"))
+        painter.setBrush(QColor("#F4F4F5"))
         for item in self.scene().selectedItems():
             if not self._item_supports_resize(item):
                 continue
@@ -351,7 +358,7 @@ class CanvasView(QGraphicsView):
                 continue
             dest = item.mapToScene(item._dest_c)
             painter.setPen(QPen(QColor("#7E9CD8"), pen_width))
-            painter.setBrush(QColor("#7E9CD8"))
+            painter.setBrush(QColor("#F4F4F5"))
             painter.drawRect(
                 dest.x() - handle_size / 2,
                 dest.y() - handle_size / 2,
@@ -504,6 +511,64 @@ class CanvasView(QGraphicsView):
         else:
             event.ignore()
 
+    def _show_shortcut_overlay(self) -> None:
+        """Show a semi-transparent overlay with keyboard shortcuts."""
+        if self._shortcut_overlay is not None:
+            self._shortcut_overlay.deleteLater()
+            self._shortcut_overlay = None
+            return
+
+        overlay = QLabel(self.viewport())
+        overlay.setStyleSheet(
+            "background-color: rgba(24, 24, 27, 0.92); color: #F4F4F5; "
+            "border-radius: 10px; padding: 16px; font-size: 13px; line-height: 1.6;"
+        )
+        text = (
+            "<b>Keyboard Shortcuts</b><br><br>"
+            "<table cellspacing='8'>"
+            "<tr><td><b>V</b></td><td>Select</td>"
+            "<td><b>R</b></td><td>Rectangle</td></tr>"
+            "<tr><td><b>O</b></td><td>Ellipse</td>"
+            "<td><b>L</b></td><td>Line</td></tr>"
+            "<tr><td><b>A</b></td><td>Arrow</td>"
+            "<td><b>P</b></td><td>Pen</td></tr>"
+            "<tr><td><b>M</b></td><td>Marker</td>"
+            "<td><b>T</b></td><td>Text</td></tr>"
+            "<tr><td><b>K</b></td><td>Label</td>"
+            "<td><b>N</b></td><td>Counter</td></tr>"
+            "<tr><td><b>U</b></td><td>Ruler</td>"
+            "<td><b>I</b></td><td>Spotlight</td></tr>"
+            "<tr><td><b>B</b></td><td>Blur</td>"
+            "<td><b>G</b></td><td>Magnifier</td></tr>"
+            "<tr><td><b>S</b></td><td>Shape</td>"
+            "<td><b>E</b></td><td>Emoji</td></tr>"
+            "<tr><td><b>Ctrl+Z</b></td><td>Undo</td>"
+            "<td><b>Ctrl+Y</b></td><td>Redo</td></tr>"
+            "<tr><td><b>Ctrl+C</b></td><td>Copy & save</td>"
+            "<td><b>Ctrl+S</b></td><td>Save as</td></tr>"
+            "<tr><td><b>Del</b></td><td>Delete selection</td>"
+            "<td><b>PgUp/PgDn</b></td><td>Layer order</td></tr>"
+            "<tr><td><b>Esc</b></td><td>Close</td>"
+            "<td><b>?</b></td><td>Toggle this help</td></tr>"
+            "</table>"
+        )
+        overlay.setTextFormat(Qt.TextFormat.RichText)
+        overlay.setText(text)
+        overlay.adjustSize()
+
+        # Center in viewport
+        vp = self.viewport()
+        x = (vp.width() - overlay.width()) // 2
+        y = (vp.height() - overlay.height()) // 2
+        overlay.move(max(0, x), max(0, y))
+        overlay.show()
+        self._shortcut_overlay = overlay
+
+    def _hide_hint(self) -> None:
+        if self._shortcut_overlay is not None and getattr(self._shortcut_overlay, "_is_hint", False):
+            self._shortcut_overlay.deleteLater()
+            self._shortcut_overlay = None
+
     def keyPressEvent(self, event: QKeyEvent) -> None:
         # When a text item is being edited, let it handle all keys — don't
         # intercept tool shortcuts like R, T, etc.
@@ -513,6 +578,12 @@ class CanvasView(QGraphicsView):
             if isinstance(focused, QGraphicsTextItem):
                 super().keyPressEvent(event)
                 return
+
+        # Shortcut help overlay
+        if event.key() == Qt.Key.Key_Question and not (event.modifiers() & Qt.KeyboardModifier.ShiftModifier):
+            self._show_shortcut_overlay()
+            event.accept()
+            return
 
         # Tool shortcuts — mirror the toolbar so they work when the canvas has focus
         tool_keys = {
@@ -536,6 +607,7 @@ class CanvasView(QGraphicsView):
         if event.key() in tool_keys and not (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
             self.tool_selected.emit(tool_keys[event.key()])
             event.accept()
+            self._hide_hint()
             return
 
         if event.key() == Qt.Key.Key_Escape:
@@ -543,6 +615,12 @@ class CanvasView(QGraphicsView):
             focused = self.scene().focusItem()
             if focused is not None:
                 focused.clearFocus()
+                event.accept()
+                return
+            # If shortcut overlay is visible, close it
+            if self._shortcut_overlay is not None:
+                self._shortcut_overlay.deleteLater()
+                self._shortcut_overlay = None
                 event.accept()
                 return
             self.window().close()
@@ -591,3 +669,25 @@ class CanvasView(QGraphicsView):
             event.accept()
         else:
             super().keyPressEvent(event)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        # Show a subtle hint if the canvas is empty (no annotations yet)
+        if not self._hint_shown and self.scene() is not None:
+            items = [i for i in self.scene().items() if not isinstance(i, CanvasImageItem)]
+            if len(items) == 0:
+                self._hint_shown = True
+                hint = QLabel(self.viewport())
+                hint.setStyleSheet(
+                    "color: #71717A; font-size: 14px; background: transparent;"
+                )
+                hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                hint.setText("Click a tool to annotate  ·  Ctrl+C to copy & save")
+                hint.adjustSize()
+                vp = self.viewport()
+                hint.move((vp.width() - hint.width()) // 2, vp.height() // 2 + 40)
+                hint.show()
+                hint._is_hint = True
+                self._shortcut_overlay = hint
+                from PySide6.QtCore import QTimer
+                QTimer.singleShot(4000, self._hide_hint)

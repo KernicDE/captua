@@ -111,22 +111,3 @@ def capture_window() -> QPixmap:
         return pixmap
     finally:
         Path(tmp_path).unlink(missing_ok=True)
-
-
-def copy_pixmap_to_clipboard(pixmap: QPixmap) -> None:
-    """Copy a QPixmap to the Wayland clipboard via wl-copy."""
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-        tmp_path = tmp.name
-
-    try:
-        pixmap.save(tmp_path, "PNG")
-        subprocess.run(
-            ["wl-copy", "--type", "image/png"],
-            input=Path(tmp_path).read_bytes(),
-            check=True,
-            timeout=_TIMEOUT,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(f"wl-copy timed out after {_TIMEOUT}s") from exc
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)
