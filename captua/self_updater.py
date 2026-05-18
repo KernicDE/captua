@@ -1,79 +1,77 @@
-"""Self-update logic: git pull + reinstall, then restart."""
+"""Self-update logic: pip install from GitHub release tarball, then restart."""
 
 from __future__ import annotations
 
 import os
 import sys
-from pathlib import Path
+import tempfile
 
 from PySide6.QtCore import QObject, QProcess, Signal
 
 
-def _project_root() -> Path | None:
-    """Return the project root if it looks like a git clone."""
-    root = Path(__file__).resolve().parent.parent
-    if (root / ".git").is_dir():
-        return root
-    return None
-
-
-def _can_self_update() -> bool:
-    """Return True if we are running from a git clone."""
-    return _project_root() is not None
-
-
 class SelfUpdater(QObject):
-    """Async self-updater using QProcess (git pull + pip install -e .)."""
+    """Async self-updater using pip + GitHub release tarball."""
 
     progress = Signal(str)  # human-readable status line
     finished = Signal(bool, str)  # success, message
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, target_version: str, parent=None) -> None:
         super().__init__(parent)
-        self._root = _project_root()
+        self._version = target_version
         self._proc: QProcess | None = None
-        self._success_so_far = True
-        self._pending_msg = ""
 
     def start(self) -> None:
         """Begin the update sequence."""
-        if self._root is None:
-            self.finished.emit(False, "Cannot self-update: not a git clone.")
-            return
-        self._run_git_pull()
+        url = f"https://github.com/KernicDE/captua/archive/refs/tags/v{self._version}.tar.gz"
+        self._run_pip(["install", "--upgrade", url])
 
-    def _run_git_pull(self) -> None:
-        self.progress.emit("Pulling latest changes…")
+    def _run_pip(self, args: list[str]) -> None:
+        self.progress.emit("Downloading and installing update…")
         self._proc = QProcess(self)
-        self._proc.setWorkingDirectory(str(self._root))
-        self._proc.finished.connect(self._on_git_finished)
-        self._proc.start("git", ["pull", "origin", "main"])
-
-    def _on_git_finished(self, exit_code: int, _exit_status) -> None:
-        if exit_code != 0:
-            out = self._proc.readAllStandardError().data().decode("utf-8", "replace").strip()
-            self.finished.emit(False, f"git pull failed:\n{out or 'unknown error'}")
-            return
-        self._run_pip_install()
-
-    def _run_pip_install(self) -> None:
-        self.progress.emit("Re-installing…")
-        self._proc = QProcess(self)
-        self._proc.setWorkingDirectory(str(self._root))
         self._proc.finished.connect(self._on_pip_finished)
-        # Use the same Python interpreter that's running Captua
-        self._proc.start(sys.executable, ["-m", "pip", "install", "-e", "."])
+        self._proc.start(sys.executable, ["-m", "pip", *args])
 
     def _on_pip_finished(self, exit_code: int, _exit_status) -> None:
         if exit_code != 0:
             out = self._proc.readAllStandardError().data().decode("utf-8", "replace").strip()
-            self.finished.emit(False, f"pip install failed:\n{out or 'unknown error'}")
+            # If the error looks like a permission issue, try --user as a fallback
+            if "Permission denied" in out or "permission denied" in out.lower():
+                self._try_user_install()
+                return
+            self.finished.emit(
+                False,
+                f"Update failed.\n{out or 'pip exited with an error.'}",
+            )
+            return
+        self.progress.emit("Update complete.")
+        self.finished.emit(True, "Captua has been updated and will now restart.")
+
+    def _try_user_install(self) -> None:
+        """Retry with --user when a system-wide install lacks permissions."""
+        self.progress.emit("Retrying with user install…")
+        url = f"https://github.com/KernicDE/captua/archive/refs/tags/v{self._version}.tar.gz"
+        self._proc = QProcess(self)
+        self._proc.finished.connect(self._on_user_pip_finished)
+        self._proc.start(sys.executable, ["-m", "pip", "install", "--upgrade", "--user", url])
+
+    def _on_user_pip_finished(self, exit_code: int, _exit_status) -> None:
+        if exit_code != 0:
+            out = self._proc.readAllStandardError().data().decode("utf-8", "replace").strip()
+            self.finished.emit(
+                False,
+                f"Update failed (even with --user).\n{out or 'pip exited with an error.'}",
+            )
             return
         self.progress.emit("Update complete.")
         self.finished.emit(True, "Captua has been updated and will now restart.")
 
     @staticmethod
     def restart() -> None:
-        """Replace the current process with a fresh instance of Captua."""
-        # os.execl replaces the current process — cleanest restart possible.
+        """Replace the current process with a fresh instance of Captua.
+
+        We chdir to a temp directory first so that the old source folder
+        (if the user is running from a git clone) does not shadow the
+        newly installed package on PYTHONPATH.
+        """
+        os.chdir(tempfile.gettempdir())
         os.execl(sys.executable, sys.executable, "-m", "captua", *sys.argv[1:])

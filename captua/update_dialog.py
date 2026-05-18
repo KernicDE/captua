@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .self_updater import SelfUpdater, _can_self_update
+from .self_updater import SelfUpdater
 
 
 class UpdateDialog(QWidget):
@@ -89,9 +89,7 @@ class UpdateDialog(QWidget):
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
 
-        can_self = _can_self_update()
-
-        self._update_btn = QPushButton("Update Now" if can_self else "Open Release Page")
+        self._update_btn = QPushButton("Update Now")
         self._update_btn.setFixedHeight(36)
         self._update_btn.setStyleSheet(
             "QPushButton { background-color: #7E9CD8; color: #18181B; "
@@ -100,10 +98,7 @@ class UpdateDialog(QWidget):
             "QPushButton:pressed { background-color: #5A7FB8; }"
         )
         self._update_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        if can_self:
-            self._update_btn.clicked.connect(self._on_self_update)
-        else:
-            self._update_btn.clicked.connect(self._on_open_page)
+        self._update_btn.clicked.connect(self._on_self_update)
         btn_row.addWidget(self._update_btn)
 
         self._later_btn = QPushButton("Ask Again Later")
