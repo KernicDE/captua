@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "captua"
-version = "0.2.0"
+version = "0.3.0"
 description = "A Shottr clone for Linux/Wayland"
 requires-python = ">=3.11"
 dependencies = [

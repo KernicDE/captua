@@ -11,6 +11,8 @@ captua/
   canvas.py         # QGraphicsScene + QGraphicsView with zoom/pan, backdrop draw helper, shortcut overlay
   toolbar.py        # Top toolbar: action buttons, tool buttons with icons, contextual property controls
   icons.py          # Programmatically-drawn monochrome toolbar icons
+  updater.py        # Async GitHub release checker (QNetworkAccessManager)
+  update_dialog.py  # Non-blocking update-available dialog
   tools.py          # Annotation tool implementations (pen, arrow, text, etc.)
   items.py          # QGraphicsItem subclasses for annotations and images
   backdrop.py       # Backdrop settings dialog with live preview
@@ -37,8 +39,10 @@ pyproject.toml      # Project config
 - `CanvasView.drawBackground()` paints checkerboard + backdrop (not scene items)
 - `CanvasView.drawForeground()` paints resize handles for selected rect items
 - `capture.py` is the only module that shells out to system commands
-- `settings.py` persists backdrop preferences, default tool properties, and auto-save settings to `~/.config/captua/settings.json`
+- `settings.py` persists backdrop preferences, default tool properties, auto-save, and update-check settings to `~/.config/captua/settings.json`
 - `icons.py` renders all toolbar icons as crisp 20×20 QPixmaps using QPainter
+- `updater.py` checks GitHub releases API asynchronously on startup (3-second delay)
+- `update_dialog.py` shows a non-modal, stay-on-top dialog with changelog and Update Now / Ask Again / Skip buttons
 
 ## Key Behaviours
 - **Backdrop in exports**: `OverlayWindow.render_to_pixmap()` computes `itemsBoundingRect()`, draws the backdrop via `draw_backdrop()`, then renders scene items on top.
@@ -48,6 +52,10 @@ pyproject.toml      # Project config
 - **Auto-save on copy**: When `auto_save_on_copy` is true (default), pressing `Ctrl+C` or clicking Copy copies to clipboard via `QClipboard`, saves to `~/Pictures/Screenshots/captua-<timestamp>.png`, shows a brief toast, and closes the app.
 - **Contextual properties**: The toolbar properties panel (colour, width, fill alpha) is only visible when a drawing tool is active or a single item is selected.
 - **Keyboard shortcut overlay**: Press `?` to show a help overlay listing all shortcuts. Press `Esc` or `?` again to dismiss.
+- **Auto-updater**: After a 3-second delay on startup, the app checks GitHub releases. If a newer version exists and hasn't been skipped, a non-modal dialog appears showing the changelog with three options:
+  - **Update Now** — opens the release page in the default browser
+  - **Ask Again Later** — dismisses the dialog; will ask again on next startup
+  - **Skip This Version** — persists the skipped version to settings; won't ask again until a newer release
 
 ## Coding Style
 - Type hints throughout

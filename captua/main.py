@@ -8,6 +8,9 @@ from PySide6.QtWidgets import QApplication
 
 from .capture import capture_region, capture_screen
 from .overlay import OverlayWindow
+from .settings import load_settings
+
+from . import __version__
 
 
 def main() -> int:
@@ -73,6 +76,26 @@ def main() -> int:
         window.set_image(pixmap)
 
     window.show()
+
+    # Async update check (non-blocking, 3-second delay to not interrupt workflow)
+    settings = load_settings()
+    if settings.get("update_check_enabled", True):
+        from .updater import UpdateChecker
+        from .update_dialog import UpdateDialog
+        from .settings import save_settings
+
+        def _on_update_found(version: str, changelog: str, url: str) -> None:
+            skipped = settings.get("skipped_version", "")
+            if skipped == version:
+                return
+            dialog = UpdateDialog(version, changelog, url)
+            dialog.skipped.connect(lambda v: save_settings({**settings, "skipped_version": v}))
+            dialog.show()
+
+        checker = UpdateChecker(__version__)
+        checker.update_available.connect(_on_update_found)
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(3000, checker.check)
 
     return app.exec()
 
