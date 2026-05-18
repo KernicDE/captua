@@ -1,16 +1,19 @@
 """Non-blocking update-available dialog."""
 
-from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices, QFont
+from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
+    QProgressBar,
     QPushButton,
     QScrollArea,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
+
+from .self_updater import SelfUpdater, _can_self_update
 
 
 class UpdateDialog(QWidget):
@@ -65,11 +68,30 @@ class UpdateDialog(QWidget):
         scroll.setWidget(changelog_widget)
         layout.addWidget(scroll, stretch=1)
 
+        # Progress bar (hidden until update starts)
+        self._progress = QProgressBar()
+        self._progress.setRange(0, 0)  # indeterminate
+        self._progress.setTextVisible(False)
+        self._progress.setStyleSheet(
+            "QProgressBar { background-color: #27272A; border: 1px solid #3F3F46; "
+            "border-radius: 4px; height: 6px; }"
+            "QProgressBar::chunk { background-color: #7E9CD8; border-radius: 4px; }"
+        )
+        self._progress.hide()
+        layout.addWidget(self._progress)
+
+        self._status = QLabel("")
+        self._status.setStyleSheet("color: #A1A1AA; font-size: 12px;")
+        self._status.hide()
+        layout.addWidget(self._status)
+
         # Buttons
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
 
-        self._update_btn = QPushButton("Update Now")
+        can_self = _can_self_update()
+
+        self._update_btn = QPushButton("Update Now" if can_self else "Open Release Page")
         self._update_btn.setFixedHeight(36)
         self._update_btn.setStyleSheet(
             "QPushButton { background-color: #7E9CD8; color: #18181B; "
@@ -78,7 +100,10 @@ class UpdateDialog(QWidget):
             "QPushButton:pressed { background-color: #5A7FB8; }"
         )
         self._update_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._update_btn.clicked.connect(self._on_update)
+        if can_self:
+            self._update_btn.clicked.connect(self._on_self_update)
+        else:
+            self._update_btn.clicked.connect(self._on_open_page)
         btn_row.addWidget(self._update_btn)
 
         self._later_btn = QPushButton("Ask Again Later")
@@ -108,7 +133,38 @@ class UpdateDialog(QWidget):
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
-    def _on_update(self) -> None:
+    def _on_self_update(self) -> None:
+        self._update_btn.setEnabled(False)
+        self._later_btn.setEnabled(False)
+        self._skip_btn.setEnabled(False)
+        self._progress.show()
+        self._status.show()
+        self._status.setText("Checking for updates…")
+
+        self._updater = SelfUpdater(self)
+        self._updater.progress.connect(self._status.setText)
+        self._updater.finished.connect(self._on_updater_finished)
+        self._updater.start()
+
+    def _on_updater_finished(self, success: bool, message: str) -> None:
+        self._progress.hide()
+        self._status.setText(message)
+        if success:
+            self._update_btn.setText("Restarting…")
+            self._update_btn.setEnabled(False)
+            QTimer.singleShot(1500, self._do_restart)
+        else:
+            self._update_btn.setText("Open Release Page")
+            self._update_btn.setEnabled(True)
+            self._update_btn.clicked.disconnect()
+            self._update_btn.clicked.connect(self._on_open_page)
+            self._later_btn.setEnabled(True)
+            self._skip_btn.setEnabled(True)
+
+    def _do_restart(self) -> None:
+        SelfUpdater.restart()
+
+    def _on_open_page(self) -> None:
         QDesktopServices.openUrl(QUrl(self._url))
         self.close()
         self.dismissed.emit()

@@ -12,7 +12,8 @@ captua/
   toolbar.py        # Top toolbar: action buttons, tool buttons with icons, contextual property controls
   icons.py          # Programmatically-drawn monochrome toolbar icons
   updater.py        # Async GitHub release checker (QNetworkAccessManager)
-  update_dialog.py  # Non-blocking update-available dialog
+  update_dialog.py  # Non-blocking update-available dialog with self-update progress
+  self_updater.py   # git pull + pip install -e . + os.execl restart
   tools.py          # Annotation tool implementations (pen, arrow, text, etc.)
   items.py          # QGraphicsItem subclasses for annotations and images
   backdrop.py       # Backdrop settings dialog with live preview
@@ -43,6 +44,7 @@ pyproject.toml      # Project config
 - `icons.py` renders all toolbar icons as crisp 20×20 QPixmaps using QPainter
 - `updater.py` checks GitHub releases API asynchronously on startup (3-second delay)
 - `update_dialog.py` shows a non-modal, stay-on-top dialog with changelog and Update Now / Ask Again / Skip buttons
+- `self_updater.py` performs the actual update when running from a git clone: `git pull origin main`, `pip install -e .`, then `os.execl` restart
 
 ## Key Behaviours
 - **Backdrop in exports**: `OverlayWindow.render_to_pixmap()` computes `itemsBoundingRect()`, draws the backdrop via `draw_backdrop()`, then renders scene items on top.
@@ -56,6 +58,7 @@ pyproject.toml      # Project config
   - **Update Now** — opens the release page in the default browser
   - **Ask Again Later** — dismisses the dialog; will ask again on next startup
   - **Skip This Version** — persists the skipped version to settings; won't ask again until a newer release
+- **Self-update**: If Captua is running from a git clone, "Update Now" performs `git pull` + `pip install -e .` and restarts automatically. Otherwise it falls back to opening the release page in a browser.
 
 ## Coding Style
 - Type hints throughout
