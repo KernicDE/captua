@@ -42,7 +42,7 @@ _ACTION_BTN_STYLE = """
         border: none;
         border-radius: 6px;
         font-size: 13px;
-        padding: 2px 8px;
+        padding: 2px 4px;
     }
     QPushButton:hover {
         background-color: #3F3F46;
@@ -177,20 +177,6 @@ class Toolbar(QWidget):
         action_row = QHBoxLayout()
         action_row.setSpacing(4)
 
-        has_frameless = False
-        if parent is not None:
-            has_frameless = bool(parent.windowFlags() & Qt.WindowType.FramelessWindowHint)
-
-        if has_frameless:
-            self._close_btn = QPushButton("✕")
-            self._close_btn.setFixedSize(32, 28)
-            self._close_btn.setStyleSheet(_ACTION_BTN_STYLE)
-            self._close_btn.setToolTip("Close (Esc)")
-            action_row.addWidget(self._close_btn)
-            self._close_btn.clicked.connect(self.close_triggered.emit)
-        else:
-            self._close_btn = None
-
         self._save_btn = QPushButton("Save")
         self._save_btn.setFixedSize(48, 28)
         self._save_btn.setStyleSheet(_ACTION_BTN_STYLE)
@@ -206,14 +192,14 @@ class Toolbar(QWidget):
         self._copy_btn.clicked.connect(self.copy_triggered.emit)
 
         self._import_btn = QPushButton("Import")
-        self._import_btn.setFixedSize(52, 28)
+        self._import_btn.setFixedSize(58, 28)
         self._import_btn.setStyleSheet(_ACTION_BTN_STYLE)
         self._import_btn.setToolTip("Import image")
         action_row.addWidget(self._import_btn)
         self._import_btn.clicked.connect(self.import_image_triggered.emit)
 
         self._capture_btn = QPushButton("Capture")
-        self._capture_btn.setFixedSize(56, 28)
+        self._capture_btn.setFixedSize(72, 28)
         self._capture_btn.setStyleSheet(_ACTION_BTN_STYLE)
         self._capture_btn.setToolTip("Capture region")
         action_row.addWidget(self._capture_btn)
@@ -223,7 +209,7 @@ class Toolbar(QWidget):
 
         # Backdrop button (non-tool, shows popup)
         self._backdrop_btn = QPushButton("Backdrop")
-        self._backdrop_btn.setFixedSize(64, 28)
+        self._backdrop_btn.setFixedSize(76, 28)
         self._backdrop_btn.setStyleSheet(_ACTION_BTN_STYLE)
         self._backdrop_btn.setToolTip("Backdrop settings")
         self._backdrop_btn.clicked.connect(self.backdrop_settings_triggered.emit)
@@ -261,13 +247,12 @@ class Toolbar(QWidget):
 
         for key, sc, icon_name, name in tools:
             btn = ToolButton(icon_name, name, sc)
+            btn.setFixedSize(28, 28)
             btn.clicked.connect(lambda checked, k=key: self._on_tool_clicked(k))
             self._buttons[key] = btn
             bottom_row.addWidget(btn)
 
         self._buttons["select"].setChecked(True)
-
-        bottom_row.addWidget(_make_separator())
 
         # Properties panel (contextual)
         self._props_widget = QWidget(self)
@@ -276,7 +261,13 @@ class Toolbar(QWidget):
         props_layout.setContentsMargins(0, 0, 0, 0)
         props_layout.setSpacing(4)
 
-        # Line color + width
+        # Line color + width (stroke group)
+        from .icons import icon
+        stroke_icon = QLabel()
+        stroke_icon.setPixmap(icon("stroke"))
+        stroke_icon.setToolTip("Stroke colour and width")
+        props_layout.addWidget(stroke_icon)
+
         self._line_color_btn = ColorSwatch()
         self._line_color_btn.color_changed.connect(self.line_color_changed.emit)
         props_layout.addWidget(self._line_color_btn)
@@ -286,7 +277,7 @@ class Toolbar(QWidget):
         self._line_width_slider = QSlider(Qt.Orientation.Horizontal)
         self._line_width_slider.setRange(1, 20)
         self._line_width_slider.setValue(3)
-        self._line_width_slider.setFixedWidth(50)
+        self._line_width_slider.setFixedWidth(40)
         self._line_width_slider.setSizePolicy(
             QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         )
@@ -294,7 +285,7 @@ class Toolbar(QWidget):
         props_layout.addWidget(self._line_width_slider)
 
         self._line_width_edit = QLineEdit("3")
-        self._line_width_edit.setFixedWidth(32)
+        self._line_width_edit.setFixedWidth(28)
         self._line_width_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._line_width_edit.setStyleSheet(_EDIT_STYLE)
         self._line_width_edit.setSizePolicy(
@@ -304,9 +295,14 @@ class Toolbar(QWidget):
         props_layout.addWidget(self._line_width_edit)
         self._on_line_width_changed(3)
 
-        props_layout.addSpacing(8)
+        props_layout.addSpacing(6)
 
-        # Fill color + alpha
+        # Fill color + alpha (fill group)
+        fill_icon = QLabel()
+        fill_icon.setPixmap(icon("fill"))
+        fill_icon.setToolTip("Fill colour and opacity")
+        props_layout.addWidget(fill_icon)
+
         self._fill_color_btn = ColorSwatch()
         self._fill_color_btn.color_changed.connect(self.fill_color_changed.emit)
         props_layout.addWidget(self._fill_color_btn)
@@ -316,7 +312,7 @@ class Toolbar(QWidget):
         self._fill_alpha_slider = QSlider(Qt.Orientation.Horizontal)
         self._fill_alpha_slider.setRange(0, 100)
         self._fill_alpha_slider.setValue(50)
-        self._fill_alpha_slider.setFixedWidth(50)
+        self._fill_alpha_slider.setFixedWidth(40)
         self._fill_alpha_slider.setSizePolicy(
             QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         )
@@ -324,7 +320,7 @@ class Toolbar(QWidget):
         props_layout.addWidget(self._fill_alpha_slider)
 
         self._fill_alpha_edit = QLineEdit("50%")
-        self._fill_alpha_edit.setFixedWidth(40)
+        self._fill_alpha_edit.setFixedWidth(32)
         self._fill_alpha_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._fill_alpha_edit.setStyleSheet(_EDIT_STYLE)
         self._fill_alpha_edit.setSizePolicy(
@@ -334,6 +330,15 @@ class Toolbar(QWidget):
         props_layout.addWidget(self._fill_alpha_edit)
         self._on_fill_alpha_changed(50)
 
+        # Separator + spacing that only shows when properties are visible
+        self._props_spacer_left = QWidget()
+        self._props_spacer_left.setFixedWidth(6)
+        self._props_sep = _make_separator()
+        self._props_spacer_right = QWidget()
+        self._props_spacer_right.setFixedWidth(6)
+        bottom_row.addWidget(self._props_spacer_left)
+        bottom_row.addWidget(self._props_sep)
+        bottom_row.addWidget(self._props_spacer_right)
         bottom_row.addWidget(self._props_widget)
         bottom_row.addStretch()
         main_layout.addLayout(bottom_row)
@@ -427,6 +432,9 @@ class Toolbar(QWidget):
     def backdrop_button(self) -> QPushButton:
         return self._backdrop_btn
 
+    def set_backdrop_enabled(self, enabled: bool) -> None:
+        self._backdrop_toggle.setChecked(enabled)
+
     def update_active_tool_button(self, key: str) -> None:
         """Sync button visual state without emitting tool_changed."""
         if key not in self._buttons:
@@ -441,6 +449,12 @@ class Toolbar(QWidget):
 
     def set_properties_visible(self, visible: bool) -> None:
         self._props_widget.setVisible(visible)
+        if hasattr(self, '_props_sep'):
+            self._props_sep.setVisible(visible)
+        if hasattr(self, '_props_spacer_left'):
+            self._props_spacer_left.setVisible(visible)
+        if hasattr(self, '_props_spacer_right'):
+            self._props_spacer_right.setVisible(visible)
 
     # -- change handlers -------------------------------------------------------
 
@@ -493,5 +507,5 @@ class Toolbar(QWidget):
         if event.key() in mapping:
             self.set_tool(mapping[event.key()])
             event.accept()
-        else:
-            super().keyPressEvent(event)
+            return
+        super().keyPressEvent(event)

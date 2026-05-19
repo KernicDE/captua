@@ -80,10 +80,13 @@ class OverlayWindow(QMainWindow):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
-        # Window flags for a clean overlay look
+        # Window flags for a clean overlay look.
+        # WindowStaysOnTopHint is omitted under Wayland — Hyprland handles
+        # pinning via windowrule instead, and the flag can prevent the
+        # window from showing at all on some compositors.
         self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
+            Qt.WindowType.Window
+            | Qt.WindowType.FramelessWindowHint
         )
 
         # Background colour (dark, modern)
@@ -154,6 +157,7 @@ class OverlayWindow(QMainWindow):
         self._toolbar.set_line_width(self._props.stroke_width)
         self._toolbar.set_fill_color(self._props.fill_color)
         self._toolbar.set_fill_alpha(self._props.fill_alpha)
+
 
         # Toolbar signals
         self._toolbar.tool_changed.connect(self._set_tool)
@@ -410,6 +414,10 @@ class OverlayWindow(QMainWindow):
     def showEvent(self, event) -> None:
         """Defer fitting until the viewport has a real size."""
         super().showEvent(event)
+        # Ensure the window is wide enough for the toolbar content
+        toolbar_w = self._toolbar.minimumSizeHint().width()
+        if self.width() < toolbar_w:
+            self.resize(toolbar_w, self.height())
         if self._scene.base_image() is not None:
             self._fit_image()
 

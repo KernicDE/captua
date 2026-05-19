@@ -11,6 +11,7 @@ CONFIG_FILE = CONFIG_DIR / "settings.json"
 
 def _default_settings() -> dict:
     return {
+        "backdrop_enabled": True,
         "backdrop_padding": 25,
         "backdrop_color": "#2A2A37",
         "backdrop_use_gradient": False,
@@ -57,6 +58,7 @@ def save_settings(data: dict) -> None:
 
 def apply_to_scene(scene, settings: dict) -> None:
     """Apply loaded settings to a CanvasScene."""
+    scene.backdrop_enabled = settings.get("backdrop_enabled", True)
     scene.backdrop_padding = settings.get("backdrop_padding", 20)
     scene.backdrop_color = QColor(settings.get("backdrop_color", "#2A2A37"))
     scene.backdrop_use_gradient = settings.get("backdrop_use_gradient", False)
@@ -69,6 +71,7 @@ def apply_to_scene(scene, settings: dict) -> None:
 def extract_from_scene(scene) -> dict:
     """Extract current backdrop settings from a CanvasScene."""
     return {
+        "backdrop_enabled": scene.backdrop_enabled,
         "backdrop_padding": scene.backdrop_padding,
         "backdrop_color": scene.backdrop_color.name(),
         "backdrop_use_gradient": scene.backdrop_use_gradient,

@@ -172,6 +172,13 @@ def icon(name: str, active: bool = False) -> QPixmap:
         p.drawLine(QPointF(5, 9), QPointF(13, 9))
         p.drawLine(QPointF(5, 11), QPointF(14, 11))
 
+    elif name == "stroke":
+        p.drawLine(QPointF(2, 10), QPointF(18, 10))
+
+    elif name == "fill":
+        p.setBrush(color)
+        p.drawRect(QRectF(4, 4, 12, 12))
+
     else:
         p.drawText(QRectF(0, 0, s, s), Qt.AlignmentFlag.AlignCenter, name[0].upper())
 

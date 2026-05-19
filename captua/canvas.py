@@ -16,6 +16,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
+    QGraphicsItem,
     QGraphicsPixmapItem,
     QGraphicsScene,
     QGraphicsTextItem,
@@ -30,6 +31,8 @@ from .items import CanvasImageItem, MagnifierCalloutItem
 def draw_backdrop(painter: QPainter, scene: "CanvasScene", images_rect: QRectF) -> None:
     """Paint the backdrop rectangle behind images."""
     if images_rect.isEmpty():
+        return
+    if not getattr(scene, "backdrop_enabled", True):
         return
     pad = scene.backdrop_padding
     if pad <= 0:
@@ -63,6 +66,7 @@ class CanvasScene(QGraphicsScene):
         self._content_rect = QRectF()
 
         # Backdrop / canvas appearance settings (drawn by CanvasView)
+        self.backdrop_enabled = True
         self.backdrop_padding = 20
         self.backdrop_color = QColor("#2A2A37")
         self.backdrop_use_gradient = False
@@ -97,6 +101,11 @@ class CanvasScene(QGraphicsScene):
         item = CanvasImageItem(pixmap)
         item.setZValue(0)
         item.set_corner_radius(self.canvas_corner_radius)
+        # Added images are movable; the base image stays fixed
+        item.setFlags(
+            QGraphicsItem.GraphicsItemFlag.ItemIsSelectable
+            | QGraphicsItem.GraphicsItemFlag.ItemIsMovable
+        )
         if pos is not None:
             item.setPos(pos)
         self.addItem(item)
@@ -609,6 +618,7 @@ class CanvasView(QGraphicsView):
             event.accept()
             self._hide_hint()
             return
+
 
         if event.key() == Qt.Key.Key_Escape:
             # If a text item has focus, clear focus instead of closing
