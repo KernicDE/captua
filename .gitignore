@@ -40,3 +40,12 @@ env/
 docs/superpowers/
 @eaDir/
 *.sync-conflict-*
+
+# AI assistant files
+AGENTS.md
+
+CLAUDE.md
+
+# Environment variables
+.env
+.env.*
