@@ -32,6 +32,7 @@ from .tools import (
     CropTool,
     EllipseTool,
     EmojiTool,
+    EyedropperTool,
     LabelTool,
     LineTool,
     MagnifierTool,
@@ -139,6 +140,7 @@ class OverlayWindow(QMainWindow):
             "spotlight": SpotlightTool(self._scene, self._props, history),
             "blur": BlurTool(self._scene, self._props, history),
             "magnifier": MagnifierTool(self._scene, self._props, history),
+            "eyedropper": EyedropperTool(self._scene, self._props, history),
             "shape": ShapeTool(self._scene, self._props, history),
             "emoji": EmojiTool(self._scene, self._props, history),
         }
@@ -174,6 +176,7 @@ class OverlayWindow(QMainWindow):
         self._toolbar.capture_triggered.connect(self._capture_region)
         self._toolbar.backdrop_settings_triggered.connect(self._show_backdrop_dialog)
         self._toolbar.magnifier_zoom_changed.connect(self._update_magnifier_zoom)
+        self._toolbar.snap_toggled.connect(self._update_snap)
 
         self._view.tool_finished.connect(lambda: self._set_tool("select"))
         self._view.tool_selected.connect(self._set_tool)
@@ -187,7 +190,7 @@ class OverlayWindow(QMainWindow):
         self._toolbar.update_active_tool_button(name)
         # Show/hide properties based on whether the tool needs them
         self._toolbar.set_properties_visible(
-            name not in ("select", "crop", "counter", "magnifier", "emoji", "shape")
+            name not in ("select", "crop", "counter", "magnifier", "eyedropper", "emoji", "shape")
         )
 
     def _update_line_color(self, color) -> None:
@@ -226,7 +229,7 @@ class OverlayWindow(QMainWindow):
         items = [i for i in self._scene.selectedItems() if i is not self._scene.base_image()]
         if len(items) != 1:
             self._toolbar.set_properties_visible(
-                self._toolbar.active_tool() not in ("select", "crop", "counter", "magnifier", "emoji", "shape")
+                self._toolbar.active_tool() not in ("select", "crop", "counter", "magnifier", "eyedropper", "emoji", "shape")
             )
             return
         item = items[0]
@@ -260,6 +263,9 @@ class OverlayWindow(QMainWindow):
                 continue
             if hasattr(item, "set_zoom_level"):
                 item.set_zoom_level(zoom)
+
+    def _update_snap(self, enabled: bool) -> None:
+        self._scene.snap_enabled = enabled
 
     def _capture_region(self) -> None:
         """Capture a new region and add it to the canvas."""

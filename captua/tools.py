@@ -27,7 +27,16 @@ from .items import (
     SpotlightItem,
     TextItem,
 )
-from PySide6.QtWidgets import QGraphicsEllipseItem
+from PySide6.QtWidgets import QApplication, QGraphicsEllipseItem, QLabel
+
+
+def _shift_held(event: QMouseEvent) -> bool:
+    return bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+
+
+def _snap_pos(scene, pos: QPointF, exclude_item=None) -> QPointF:
+    from .canvas import snap_point
+    return snap_point(scene, pos, exclude_item)
 
 
 class ToolProperties:
@@ -72,6 +81,7 @@ class Tool:
         pass
 
     def mouse_release(self, event: QMouseEvent, pos: QPointF) -> None:
+        # Deactivate on right-click or when switching away
         pass
 
     def _push_add(self, item) -> None:
@@ -151,7 +161,15 @@ class RectangleTool(Tool):
 
     def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
-            rect = QRectF(self._start, pos).normalized()
+            if not _shift_held(event):
+                pos = _snap_pos(self.scene, pos, self._active_item)
+            dx = pos.x() - self._start.x()
+            dy = pos.y() - self._start.y()
+            if _shift_held(event):
+                size = max(abs(dx), abs(dy))
+                dx = size if dx >= 0 else -size
+                dy = size if dy >= 0 else -size
+            rect = QRectF(self._start, QPointF(self._start.x() + dx, self._start.y() + dy)).normalized()
             self._active_item.setRect(rect)
 
     def mouse_release(self, event: QMouseEvent, pos: QPointF) -> None:
@@ -175,8 +193,13 @@ class EllipseTool(Tool):
 
     def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
+            if not _shift_held(event):
+                pos = _snap_pos(self.scene, pos, self._active_item)
             dx = abs(pos.x() - self._center.x())
             dy = abs(pos.y() - self._center.y())
+            if _shift_held(event):
+                r = max(dx, dy)
+                dx = dy = r
             rect = QRectF(self._center.x() - dx, self._center.y() - dy, dx * 2, dy * 2)
             self._active_item.setRect(rect)
 
@@ -195,7 +218,18 @@ class LineTool(Tool):
 
     def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
-            self._active_item.setLine(self._start.x(), self._start.y(), pos.x(), pos.y())
+            if not _shift_held(event):
+                pos = _snap_pos(self.scene, pos, self._active_item)
+            if _shift_held(event):
+                dx = pos.x() - self._start.x()
+                dy = pos.y() - self._start.y()
+                angle = math.atan2(dy, dx)
+                snap = round(angle / (math.pi / 4)) * (math.pi / 4)
+                dist = math.hypot(dx, dy)
+                end = QPointF(self._start.x() + dist * math.cos(snap), self._start.y() + dist * math.sin(snap))
+            else:
+                end = pos
+            self._active_item.setLine(self._start.x(), self._start.y(), end.x(), end.y())
 
     def mouse_release(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
@@ -212,7 +246,18 @@ class ArrowTool(Tool):
 
     def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
-            self._active_item.set_end(pos)
+            if not _shift_held(event):
+                pos = _snap_pos(self.scene, pos, self._active_item)
+            if _shift_held(event):
+                dx = pos.x() - self._start.x()
+                dy = pos.y() - self._start.y()
+                angle = math.atan2(dy, dx)
+                snap = round(angle / (math.pi / 4)) * (math.pi / 4)
+                dist = math.hypot(dx, dy)
+                end = QPointF(self._start.x() + dist * math.cos(snap), self._start.y() + dist * math.sin(snap))
+            else:
+                end = pos
+            self._active_item.set_end(end)
 
     def mouse_release(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
@@ -222,13 +267,15 @@ class ArrowTool(Tool):
 
 class PenTool(Tool):
     def mouse_press(self, event: QMouseEvent, pos: QPointF) -> None:
-        self._active_item = PenItem(self.props.color, self.props.stroke_width)
+        self._active_item = PenItem(self.props.color, self.props.stroke_width, smooth=_shift_held(event))
         self._active_item.setZValue(1)
         self._active_item.add_point(pos)
         self.scene.addItem(self._active_item)
 
     def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
+            if not _shift_held(event):
+                pos = _snap_pos(self.scene, pos, self._active_item)
             self._active_item.add_point(pos)
 
     def mouse_release(self, event: QMouseEvent, pos: QPointF) -> None:
@@ -239,6 +286,7 @@ class PenTool(Tool):
 
 class MarkerTool(Tool):
     def mouse_press(self, event: QMouseEvent, pos: QPointF) -> None:
+        self._start = pos
         self._active_item = MarkerItem(self.props.fill_color, self.props.fill_alpha, self.props.stroke_width * 4)
         self._active_item.setZValue(0.5)
         self._active_item.add_point(pos)
@@ -246,7 +294,12 @@ class MarkerTool(Tool):
 
     def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
-            self._active_item.add_point(pos)
+            if not _shift_held(event):
+                pos = _snap_pos(self.scene, pos, self._active_item)
+            if _shift_held(event):
+                self._active_item.set_points([self._start, pos])
+            else:
+                self._active_item.add_point(pos)
 
     def mouse_release(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
@@ -290,6 +343,8 @@ class ShapeTool(Tool):
 
     def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
+            if not _shift_held(event):
+                pos = _snap_pos(self.scene, pos, self._active_item)
             dx = abs(pos.x() - self._center.x())
             dy = abs(pos.y() - self._center.y())
             rect = QRectF(self._center.x() - dx, self._center.y() - dy, dx * 2, dy * 2)
@@ -310,6 +365,8 @@ class EmojiTool(Tool):
 
     def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
+            if not _shift_held(event):
+                pos = _snap_pos(self.scene, pos, self._active_item)
             dx = abs(pos.x() - self._center.x())
             dy = abs(pos.y() - self._center.y())
             rect = QRectF(self._center.x() - dx, self._center.y() - dy, dx * 2, dy * 2)
@@ -368,7 +425,16 @@ class SpotlightTool(Tool):
 
     def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
-            self._active_item.set_spotlight(QRectF(self._start, pos).normalized())
+            if not _shift_held(event):
+                pos = _snap_pos(self.scene, pos, self._active_item)
+            dx = pos.x() - self._start.x()
+            dy = pos.y() - self._start.y()
+            if _shift_held(event):
+                size = max(abs(dx), abs(dy))
+                dx = size if dx >= 0 else -size
+                dy = size if dy >= 0 else -size
+            rect = QRectF(self._start, QPointF(self._start.x() + dx, self._start.y() + dy)).normalized()
+            self._active_item.set_spotlight(rect)
 
     def mouse_release(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
@@ -388,7 +454,14 @@ class BlurTool(Tool):
 
     def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
-            self._active_item.setRect(QRectF(self._start, pos).normalized())
+            dx = pos.x() - self._start.x()
+            dy = pos.y() - self._start.y()
+            if _shift_held(event):
+                size = max(abs(dx), abs(dy))
+                dx = size if dx >= 0 else -size
+                dy = size if dy >= 0 else -size
+            rect = QRectF(self._start, QPointF(self._start.x() + dx, self._start.y() + dy)).normalized()
+            self._active_item.setRect(rect)
 
     def mouse_release(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
@@ -461,6 +534,8 @@ class MagnifierTool(Tool):
 
     def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
         if self._active_item is not None:
+            if not _shift_held(event):
+                pos = _snap_pos(self.scene, pos, self._active_item)
             radius = math.hypot(pos.x() - self._center.x(), pos.y() - self._center.y())
             self._active_item.setRect(
                 self._center.x() - radius,
@@ -547,3 +622,97 @@ class MagnifierTool(Tool):
             if dist >= src_r + dest_r + 10:
                 return c
         return candidates[0]
+
+
+class EyedropperTool(Tool):
+    """Colour picker with live colour read-out overlay."""
+
+    def __init__(self, scene, properties: ToolProperties, history) -> None:
+        super().__init__(scene, properties, history)
+        self._overlay: QLabel | None = None
+
+    def _get_view(self):
+        views = self.scene.views()
+        return views[0] if views else None
+
+    def _ensure_overlay(self) -> QLabel | None:
+        if self._overlay is not None:
+            return self._overlay
+        view = self._get_view()
+        if view is None:
+            return None
+        overlay = QLabel(view.viewport())
+        overlay.setStyleSheet(
+            "background-color: rgba(31,31,40,0.95); color: #DCD7BA; border-radius: 4px; "
+            "padding: 4px 8px; font-size: 11px; font-family: monospace; border: 1px solid #3F3F46;"
+        )
+        overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._overlay = overlay
+        return overlay
+
+    def _remove_overlay(self) -> None:
+        if self._overlay is not None:
+            self._overlay.deleteLater()
+            self._overlay = None
+
+    def deactivate(self) -> None:
+        self._remove_overlay()
+        super().deactivate()
+
+    def mouse_press(self, event: QMouseEvent, pos: QPointF) -> None:
+        color = self._pick_color(pos)
+        if color is not None:
+            hex_value = color.name().upper()
+            clipboard = QApplication.clipboard()
+            if clipboard is not None:
+                clipboard.setText(hex_value)
+            overlay = self._ensure_overlay()
+            if overlay is not None:
+                rgb = f"{color.red()}, {color.green()}, {color.blue()}"
+                overlay.setText(f"Copied {hex_value}   RGB {rgb}")
+                overlay.adjustSize()
+                view = self._get_view()
+                if view is not None:
+                    vp = view.viewport()
+                    vp_pos = view.mapFromScene(pos)
+                    x = vp_pos.x() + 15
+                    y = vp_pos.y() + 15
+                    max_x = vp.width() - overlay.width() - 4
+                    max_y = vp.height() - overlay.height() - 4
+                    overlay.move(max(0, min(x, max_x)), max(0, min(y, max_y)))
+                overlay.show()
+                overlay.raise_()
+
+    def mouse_move(self, event: QMouseEvent, pos: QPointF) -> None:
+        color = self._pick_color(pos)
+        overlay = self._ensure_overlay()
+        if overlay is not None and color is not None:
+            hex_val = color.name().upper()
+            rgb = f"{color.red()}, {color.green()}, {color.blue()}"
+            overlay.setText(f"{hex_val}   RGB {rgb}")
+            overlay.adjustSize()
+            view = self._get_view()
+            if view is not None:
+                vp = view.viewport()
+                vp_pos = view.mapFromScene(pos)
+                x = vp_pos.x() + 15
+                y = vp_pos.y() + 15
+                max_x = vp.width() - overlay.width() - 4
+                max_y = vp.height() - overlay.height() - 4
+                overlay.move(max(0, min(x, max_x)), max(0, min(y, max_y)))
+            overlay.show()
+            overlay.raise_()
+
+    def mouse_release(self, event: QMouseEvent, pos: QPointF) -> None:
+        pass
+
+    def _pick_color(self, pos: QPointF) -> QColor | None:
+        pixmap = QPixmap(1, 1)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        self.scene.render(painter, QRectF(0, 0, 1, 1), QRectF(pos.x(), pos.y(), 1, 1))
+        painter.end()
+        img = pixmap.toImage()
+        if img.isNull():
+            return None
+        return QColor(img.pixel(0, 0))

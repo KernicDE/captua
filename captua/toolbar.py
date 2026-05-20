@@ -51,6 +51,11 @@ _ACTION_BTN_STYLE = """
     QPushButton:pressed {
         background-color: #52525B;
     }
+    QPushButton:checked {
+        background-color: #2D4F67;
+        color: #F4F4F5;
+        border: 1px solid #7E9CD8;
+    }
 """
 
 _EDIT_STYLE = """
@@ -163,6 +168,7 @@ class Toolbar(QWidget):
     capture_triggered = Signal()
     backdrop_settings_triggered = Signal()
     magnifier_zoom_changed = Signal(float)
+    snap_toggled = Signal(bool)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -215,6 +221,16 @@ class Toolbar(QWidget):
         self._backdrop_btn.clicked.connect(self.backdrop_settings_triggered.emit)
         action_row.addWidget(self._backdrop_btn)
 
+        # Snap toggle
+        self._snap_btn = QPushButton("Snap")
+        self._snap_btn.setCheckable(True)
+        self._snap_btn.setChecked(True)
+        self._snap_btn.setFixedSize(48, 28)
+        self._snap_btn.setStyleSheet(_ACTION_BTN_STYLE)
+        self._snap_btn.setToolTip("Toggle magnetic snap")
+        self._snap_btn.clicked.connect(lambda checked: self.snap_toggled.emit(checked))
+        action_row.addWidget(self._snap_btn)
+
         action_row.addStretch()
         main_layout.addLayout(action_row)
 
@@ -243,6 +259,7 @@ class Toolbar(QWidget):
             ("spotlight", "I", "spotlight",  "Highlight"),
             ("blur",      "B", "blur",  "Blur"),
             ("magnifier", "G", "magnifier",  "Magnifier"),
+            ("eyedropper", "D", "eyedropper", "Picker"),
         ]
 
         for key, sc, icon_name, name in tools:
@@ -501,6 +518,7 @@ class Toolbar(QWidget):
             Qt.Key.Key_I: "spotlight",
             Qt.Key.Key_B: "blur",
             Qt.Key.Key_G: "magnifier",
+            Qt.Key.Key_D: "eyedropper",
             Qt.Key.Key_S: "shape",
             Qt.Key.Key_E: "emoji",
         }

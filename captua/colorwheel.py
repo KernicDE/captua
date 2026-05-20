@@ -1,10 +1,20 @@
-"""HSL colour disc picker dialog."""
+"""HSL colour disc picker dialog with HEX and RGB inputs."""
 
 import math
 
 from PySide6.QtCore import Qt, QPoint, Signal
 from PySide6.QtGui import QColor, QImage, QMouseEvent, QPainter, QPaintEvent, QPen
-from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSlider,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class _ColorDisc(QWidget):
@@ -17,7 +27,7 @@ class _ColorDisc(QWidget):
         self._lightness = 0.5
         self._inverted = True  # True: white centre → black rim (default)
         self._cached: QImage | None = None
-        self.setFixedSize(240, 240)
+        self.setFixedSize(220, 220)
         self.setCursor(Qt.CursorShape.CrossCursor)
 
     def _center(self) -> QPoint:
@@ -150,28 +160,84 @@ _DIALOG_STYLE = """
     }
 """
 
+_EDIT_STYLE = """
+    QLineEdit {
+        background-color: #27272A;
+        color: #F4F4F5;
+        border: 1px solid #3F3F46;
+        border-radius: 4px;
+        padding: 0 4px;
+        font-size: 12px;
+    }
+    QLineEdit:focus {
+        border: 1px solid #7E9CD8;
+    }
+"""
+
+_SPIN_STYLE = """
+    QSpinBox {
+        background-color: #27272A;
+        color: #F4F4F5;
+        border: 1px solid #3F3F46;
+        border-radius: 4px;
+        padding: 0 4px;
+        font-size: 12px;
+    }
+    QSpinBox:focus {
+        border: 1px solid #7E9CD8;
+    }
+    QSpinBox::up-button, QSpinBox::down-button {
+        width: 0px;
+        border: none;
+    }
+"""
+
 
 class ColorWheelDialog(QDialog):
-    """Popup dialog with an HSL colour disc."""
+    """Popup dialog with an HSL colour disc, HEX input, and RGB inputs."""
 
     color_selected = Signal(QColor)
 
     def __init__(self, initial_color: QColor, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Pick a colour")
-        self.setFixedSize(280, 400)
+        self.setFixedSize(360, 340)
         self.setStyleSheet(_DIALOG_STYLE)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        # Top row: disc on the left, RGB on the right
+        top_row = QHBoxLayout()
+        top_row.setSpacing(12)
 
         self._disc = _ColorDisc(self)
         self._disc.set_color(initial_color)
-        layout.addWidget(self._disc, alignment=Qt.AlignmentFlag.AlignCenter)
+        top_row.addWidget(self._disc, alignment=Qt.AlignmentFlag.AlignTop)
+
+        rgb_layout = QVBoxLayout()
+        rgb_layout.setSpacing(6)
+        rgb_layout.setContentsMargins(0, 8, 0, 0)
+
+        self._r_edit = self._make_spinbox(initial_color.red())
+        self._g_edit = self._make_spinbox(initial_color.green())
+        self._b_edit = self._make_spinbox(initial_color.blue())
+        for label, edit in [("R", self._r_edit), ("G", self._g_edit), ("B", self._b_edit)]:
+            row = QHBoxLayout()
+            row.setSpacing(4)
+            lbl = QLabel(label + ":")
+            lbl.setStyleSheet("color: #F4F4F5; font-weight: bold;")
+            row.addWidget(lbl)
+            row.addWidget(edit)
+            rgb_layout.addLayout(row)
+
+        rgb_layout.addStretch()
+        top_row.addLayout(rgb_layout)
+        top_row.addStretch()
+        layout.addLayout(top_row)
 
         # Saturation slider
-        from PySide6.QtWidgets import QSlider
         sat_layout = QHBoxLayout()
         sat_label = QLabel("S:")
         sat_label.setStyleSheet("color: #F4F4F5; font-weight: bold;")
@@ -187,46 +253,103 @@ class ColorWheelDialog(QDialog):
         sat_layout.addWidget(self._sat_value)
         layout.addLayout(sat_layout)
 
-        # Preview + buttons row
+        # Preview + HEX + buttons row
         row = QHBoxLayout()
+        row.setSpacing(8)
 
         self._preview = QLabel()
-        self._preview.setFixedSize(32, 32)
-        self._preview.setStyleSheet(f"""
-            QLabel {{
-                background-color: {initial_color.name()};
-                border: 2px solid #71717A;
-                border-radius: 16px;
-            }}
-        """)
+        self._preview.setFixedSize(28, 28)
+        self._update_preview(initial_color)
         row.addWidget(self._preview)
+
+        hex_label = QLabel("HEX:")
+        hex_label.setStyleSheet("color: #F4F4F5; font-weight: bold;")
+        row.addWidget(hex_label)
+        self._hex_edit = QLineEdit(initial_color.name().upper())
+        self._hex_edit.setStyleSheet(_EDIT_STYLE)
+        self._hex_edit.setFixedWidth(90)
+        self._hex_edit.editingFinished.connect(self._on_hex_changed)
+        row.addWidget(self._hex_edit)
 
         row.addStretch()
 
         ok_btn = QPushButton("OK")
-        ok_btn.setFixedHeight(32)
+        ok_btn.setFixedHeight(28)
         ok_btn.clicked.connect(self.accept)
         row.addWidget(ok_btn)
 
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.setFixedHeight(32)
+        cancel_btn.setFixedHeight(28)
         cancel_btn.clicked.connect(self.reject)
         row.addWidget(cancel_btn)
 
         layout.addLayout(row)
 
-        self._disc.color_changed.connect(self._on_color_changed)
+        self._disc.color_changed.connect(self._on_disc_color_changed)
+        for edit in (self._r_edit, self._g_edit, self._b_edit):
+            edit.valueChanged.connect(self._on_rgba_changed)
+
+    def _make_spinbox(self, value: int) -> QSpinBox:
+        sb = QSpinBox()
+        sb.setRange(0, 255)
+        sb.setValue(value)
+        sb.setFixedWidth(56)
+        sb.setStyleSheet(_SPIN_STYLE)
+        return sb
 
     def _on_sat_changed(self, value: int) -> None:
-        self._disc.set_saturation(value / 100.0)
         self._sat_value.setText(f"{value}%")
+        self._disc.set_saturation(value / 100.0)
 
-    def _on_color_changed(self, color: QColor) -> None:
+    def _on_disc_color_changed(self, color: QColor) -> None:
+        self._r_edit.blockSignals(True)
+        self._g_edit.blockSignals(True)
+        self._b_edit.blockSignals(True)
+        self._r_edit.setValue(color.red())
+        self._g_edit.setValue(color.green())
+        self._b_edit.setValue(color.blue())
+        self._r_edit.blockSignals(False)
+        self._g_edit.blockSignals(False)
+        self._b_edit.blockSignals(False)
+        self._hex_edit.setText(color.name().upper())
+        self._update_preview(color)
+
+    def _on_rgba_changed(self) -> None:
+        color = QColor(
+            self._r_edit.value(),
+            self._g_edit.value(),
+            self._b_edit.value(),
+        )
+        self._disc.blockSignals(True)
+        self._disc.set_color(color)
+        self._disc.blockSignals(False)
+        self._hex_edit.setText(color.name().upper())
+        self._update_preview(color)
+
+    def _on_hex_changed(self) -> None:
+        text = self._hex_edit.text().strip()
+        color = QColor(text)
+        if color.isValid():
+            self._disc.blockSignals(True)
+            self._disc.set_color(color)
+            self._disc.blockSignals(False)
+            self._r_edit.blockSignals(True)
+            self._g_edit.blockSignals(True)
+            self._b_edit.blockSignals(True)
+            self._r_edit.setValue(color.red())
+            self._g_edit.setValue(color.green())
+            self._b_edit.setValue(color.blue())
+            self._r_edit.blockSignals(False)
+            self._g_edit.blockSignals(False)
+            self._b_edit.blockSignals(False)
+            self._update_preview(color)
+
+    def _update_preview(self, color: QColor) -> None:
         self._preview.setStyleSheet(f"""
             QLabel {{
                 background-color: {color.name()};
                 border: 2px solid #71717A;
-                border-radius: 16px;
+                border-radius: 14px;
             }}
         """)
 

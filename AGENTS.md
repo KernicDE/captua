@@ -59,6 +59,10 @@ pyproject.toml      # Project config
   - **Ask Again Later** — dismisses the dialog; will ask again on next startup
   - **Skip This Version** — persists the skipped version to settings; won't ask again until a newer release
 - **Self-update**: If Captua is running from a git clone, "Update Now" performs `git pull` + `pip install -e .` and restarts automatically. Otherwise it falls back to opening the release page in a browser.
+- **Magnetic snap**: Enabled via toolbar toggle. `snap_rect()` in `canvas.py` aligns edges/centerlines of the moving item to all other items (including the base image) with 15 px tolerance. Drawing tools call `snap_point()` for corner/edge alignment unless Shift is held.
+- **Shift constraints while drawing**: Rectangle→square, Ellipse→circle, Line/Arrow→45° snap, Pen→Bezier smoothing, Marker→straight line, Spotlight/Blur→square.
+- **Eyedropper**: `D` shortcut. A viewport QLabel overlay (not a scene item) shows live HEX+RGB under the cursor. Click copies HEX to clipboard. The tool stays active until another tool is chosen.
+- **Spotlight resize**: `SpotlightItem` exposes `rect()`/`setRect()` so `CanvasView` resize handles work on the inner transparent rectangle. `mousePressEvent` selects the item on any click; drag inside the spotlight moves the inner rect.
 
 ## Coding Style
 - Type hints throughout

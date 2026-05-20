@@ -17,8 +17,10 @@ def _default_settings() -> dict:
         "backdrop_use_gradient": False,
         "backdrop_gradient_start": "#2A2A37",
         "backdrop_gradient_end": "#1F1F28",
+        "backdrop_gradient_angle": 45,
         "backdrop_corner_radius": 0,
         "canvas_corner_radius": 0,
+        "snap_enabled": True,
         "line_color": "#FF5D62",
         "line_width": 3,
         "fill_color": "#FF5D62",
@@ -64,8 +66,10 @@ def apply_to_scene(scene, settings: dict) -> None:
     scene.backdrop_use_gradient = settings.get("backdrop_use_gradient", False)
     scene.backdrop_gradient_start = QColor(settings.get("backdrop_gradient_start", "#2A2A37"))
     scene.backdrop_gradient_end = QColor(settings.get("backdrop_gradient_end", "#1F1F28"))
+    scene.backdrop_gradient_angle = settings.get("backdrop_gradient_angle", 45)
     scene.backdrop_corner_radius = settings.get("backdrop_corner_radius", 0)
     scene.canvas_corner_radius = settings.get("canvas_corner_radius", 0)
+    scene.snap_enabled = settings.get("snap_enabled", True)
 
 
 def extract_from_scene(scene) -> dict:
@@ -77,6 +81,8 @@ def extract_from_scene(scene) -> dict:
         "backdrop_use_gradient": scene.backdrop_use_gradient,
         "backdrop_gradient_start": scene.backdrop_gradient_start.name(),
         "backdrop_gradient_end": scene.backdrop_gradient_end.name(),
+        "backdrop_gradient_angle": scene.backdrop_gradient_angle,
         "backdrop_corner_radius": scene.backdrop_corner_radius,
         "canvas_corner_radius": scene.canvas_corner_radius,
+        "snap_enabled": scene.snap_enabled,
     }

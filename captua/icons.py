@@ -140,6 +140,19 @@ def icon(name: str, active: bool = False) -> QPixmap:
         p.drawLine(QPointF(11, 7), QPointF(11, 10))
         p.drawArc(QRectF(6, 8, 5, 4), 0, -180 * 16)
 
+    elif name == "eyedropper":
+        # Bulb at top
+        p.drawEllipse(QRectF(11, 1, 7, 7))
+        # Stem
+        p.drawLine(QPointF(14, 7), QPointF(7, 15))
+        # Tip
+        path = QPainterPath()
+        path.moveTo(7, 15)
+        path.lineTo(5, 18)
+        path.lineTo(9, 16)
+        path.closeSubpath()
+        p.drawPath(path)
+
     elif name == "close":
         p.drawLine(QPointF(5, 5), QPointF(15, 15))
         p.drawLine(QPointF(15, 5), QPointF(5, 15))

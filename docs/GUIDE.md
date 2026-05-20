@@ -56,6 +56,7 @@ The top bar contains (left to right):
 | 🔦 Highlight | `I` | Spotlight / dim overlay |
 | 🌫 Blur | `B` | Blur region (privacy) |
 | 🔍 Magnifier | `G` | Loupe that zooms part of the image |
+| 🧪 Picker | `D` | Eyedropper — live colour read-out, click to copy HEX |
 
 ### Selection Editing
 
@@ -69,6 +70,25 @@ When a single item is selected, the toolbar shows that item's properties. Changi
 ### Resize Handles
 
 In Mouse mode, blue corner handles appear on rectangle-based items. Drag a handle to resize.
+
+Spotlight / Highlight can also be resized — drag the inner transparent rectangle to move it, or drag the corner handles to resize it.
+
+### Magnetic Snap
+
+When **Snap** is enabled in the toolbar, edges and centerlines of items automatically align to each other while drawing and moving. The snapping distance is ~15 px.
+
+### Shift Constraints
+
+Hold **Shift** while drawing to constrain the shape:
+
+| Tool | Constraint |
+|---|---|
+| Rectangle | Square |
+| Ellipse | Circle |
+| Line / Arrow | 45° angles |
+| Pen | Smooth Bezier curves |
+| Marker | Straight line |
+| Spotlight / Blur | Square |
 
 ## Layer Ordering
 
@@ -112,12 +132,15 @@ Changes are previewed live. Settings persist between sessions.
 | `Ctrl+Y` | Redo |
 | `Delete` / `Backspace` | Remove selected items |
 | `PgUp` / `PgDn` | Change layer order |
+| `?` | Toggle keyboard-shortcut overlay |
 | `Middle-drag` | Pan the canvas |
 | `Ctrl+Scroll` | Zoom in / out |
 
 ## Tips
 
-- After drawing any annotation, the tool automatically switches back to **Mouse** mode so you can reposition it immediately.
+- After drawing most annotations, the tool automatically switches back to **Mouse** mode so you can reposition it immediately.
+- The **Picker** (`D`) stays active after a click so you can sample multiple colours; switch to another tool when done.
 - The canvas auto-expands when you drag items beyond the current boundary; the window grows to match.
 - Use **Undo** liberally — the full history is kept in memory for the session.
 - The checkerboard pattern behind the canvas is only visible in the editor; it is **not** included in saved or copied images.
+- Captua checks for updates on startup. If a newer version is available you can update with one click (when running from a git clone) or open the release page in your browser.

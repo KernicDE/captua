@@ -47,6 +47,23 @@ def _create_pen(color: QColor, width: float, cosmetic: bool = True) -> QPen:
     return pen
 
 
+def _snap_item_change(item: QGraphicsItem, change, value):
+    if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
+        scene = item.scene()
+        if scene is not None:
+            from .canvas import snap_rect
+            new_bbox = item.boundingRect().translated(value)
+            delta = snap_rect(scene, new_bbox, item)
+            if delta != QPointF(0, 0):
+                snapped = value + delta
+                for view in scene.views():
+                    if hasattr(view, "_schedule_item_snap"):
+                        view._schedule_item_snap(item, snapped)
+                        break
+                return snapped
+    return None
+
+
 class RectangleItem(QGraphicsRectItem):
     """Rectangle with optional rounded corners."""
 
@@ -68,6 +85,12 @@ class RectangleItem(QGraphicsRectItem):
             QGraphicsItem.GraphicsItemFlag.ItemIsSelectable
             | QGraphicsItem.GraphicsItemFlag.ItemIsMovable
         )
+
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
 
     def set_line_color(self, color: QColor) -> None:
         self._line_color = QColor(color)
@@ -138,6 +161,12 @@ class EllipseItem(QGraphicsEllipseItem):
             | QGraphicsItem.GraphicsItemFlag.ItemIsMovable
         )
 
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
+
     def set_line_color(self, color: QColor) -> None:
         self._line_color = QColor(color)
         self.setPen(_create_pen(color, self._line_width))
@@ -196,6 +225,12 @@ class LineItem(QGraphicsLineItem):
             | QGraphicsItem.GraphicsItemFlag.ItemIsMovable
         )
 
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
+
     def set_line_color(self, color: QColor) -> None:
         self._line_color = QColor(color)
         pen = self.pen()
@@ -238,6 +273,12 @@ class ArrowItem(QGraphicsItem):
             | QGraphicsItem.GraphicsItemFlag.ItemIsMovable
         )
         self.setZValue(1)
+
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
 
     def set_end(self, p2: QPointF) -> None:
         self.prepareGeometryChange()
@@ -301,17 +342,24 @@ class ArrowItem(QGraphicsItem):
 class PenItem(QGraphicsItem):
     """Freehand pen stroke drawn as connected line segments."""
 
-    def __init__(self, color: QColor, width: float, parent=None) -> None:
+    def __init__(self, color: QColor, width: float, smooth: bool = False, parent=None) -> None:
         super().__init__(parent)
         self._points: list[QPointF] = []
         self._color = color
         self._width = width
+        self._smooth = smooth
         self._raw_bbox = QRectF()
         self.setFlags(
             QGraphicsItem.GraphicsItemFlag.ItemIsSelectable
             | QGraphicsItem.GraphicsItemFlag.ItemIsMovable
         )
         self.setZValue(1)
+
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
 
     def add_point(self, point: QPointF) -> None:
         self.prepareGeometryChange()
@@ -344,8 +392,19 @@ class PenItem(QGraphicsItem):
         if len(self._points) < 2:
             return
         painter.setPen(_create_pen(self._color, self._width))
-        for i in range(len(self._points) - 1):
-            painter.drawLine(self._points[i], self._points[i + 1])
+        if self._smooth and len(self._points) >= 3:
+            path = QPainterPath()
+            path.moveTo(self._points[0])
+            for i in range(1, len(self._points) - 1):
+                p1 = self._points[i]
+                p2 = self._points[i + 1]
+                mid = QPointF((p1.x() + p2.x()) / 2, (p1.y() + p2.y()) / 2)
+                path.quadTo(p1, mid)
+            path.lineTo(self._points[-1])
+            painter.drawPath(path)
+        else:
+            for i in range(len(self._points) - 1):
+                painter.drawLine(self._points[i], self._points[i + 1])
         if self.isSelected():
             painter.setPen(QPen(QColor("#7E9CD8"), 1, Qt.PenStyle.DashLine))
             for p in self._points:
@@ -370,10 +429,24 @@ class MarkerItem(QGraphicsItem):
         )
         self.setZValue(0.5)
 
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
+
     def add_point(self, point: QPointF) -> None:
         self.prepareGeometryChange()
         self._points.append(QPointF(point))
         self._raw_bbox = self._raw_bbox.united(QRectF(point.x(), point.y(), 0, 0))
+        self.update()
+
+    def set_points(self, points: list[QPointF]) -> None:
+        self.prepareGeometryChange()
+        self._points = [QPointF(p) for p in points]
+        self._raw_bbox = QRectF()
+        for p in self._points:
+            self._raw_bbox = self._raw_bbox.united(QRectF(p.x(), p.y(), 0, 0))
         self.update()
 
     def set_fill_color(self, color: QColor) -> None:
@@ -438,6 +511,12 @@ class TextItem(QGraphicsTextItem):
         self.setZValue(1)
         self.setTextInteractionFlags(Qt.TextInteractionFlag.TextEditorInteraction)
 
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
+
     def set_line_color(self, color: QColor) -> None:
         self.setDefaultTextColor(color)
 
@@ -478,6 +557,12 @@ class LabelItem(QGraphicsTextItem):
         )
         self.setZValue(1)
         self.setTextInteractionFlags(Qt.TextInteractionFlag.TextEditorInteraction)
+
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
 
     def set_border_color(self, color: QColor) -> None:
         self._border_color = color
@@ -545,6 +630,12 @@ class CounterItem(QGraphicsItem):
         )
         self.setZValue(1)
 
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
+
     def set_line_color(self, color: QColor) -> None:
         self._color = QColor(color)
         self.update()
@@ -589,6 +680,12 @@ class RulerItem(QGraphicsItem):
             | QGraphicsItem.GraphicsItemFlag.ItemIsMovable
         )
         self.setZValue(1)
+
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
 
     def set_end(self, p2: QPointF) -> None:
         self.prepareGeometryChange()
@@ -662,8 +759,9 @@ class SpotlightItem(QGraphicsItem):
 
     def __init__(self, overlay_rect: QRectF, spotlight_rect: QRectF, fill_color: QColor | None = None, fill_alpha: int = 180, parent=None) -> None:
         super().__init__(parent)
-        self._overlay = overlay_rect
-        self._spotlight = spotlight_rect
+        self.setPos(overlay_rect.topLeft())
+        self._overlay = QRectF(QPointF(0, 0), overlay_rect.size())
+        self._spotlight = QRectF(spotlight_rect.topLeft() - overlay_rect.topLeft(), spotlight_rect.size())
         c = QColor(fill_color) if fill_color is not None else QColor(0, 0, 0)
         self._fill_base_color = QColor(c)
         self._fill_alpha = fill_alpha
@@ -671,13 +769,26 @@ class SpotlightItem(QGraphicsItem):
         self._fill = c
         self.setFlags(
             QGraphicsItem.GraphicsItemFlag.ItemIsSelectable
-            | QGraphicsItem.GraphicsItemFlag.ItemIsMovable
         )
         self.setZValue(0.8)
+        self.setAcceptHoverEvents(True)
+        self._dragging = False
+        self._drag_start = QPointF()
+        self._spotlight_start = QRectF()
+
+    def rect(self) -> QRectF:
+        return QRectF(self._spotlight)
+
+    def setRect(self, rect: QRectF) -> None:
+        """Resize spotlight from local coords (used by CanvasView resize handles)."""
+        self.prepareGeometryChange()
+        self._spotlight = QRectF(rect)
+        self.update()
 
     def set_spotlight(self, rect: QRectF) -> None:
+        """Set spotlight from scene coords (used by SpotlightTool)."""
         self.prepareGeometryChange()
-        self._spotlight = rect
+        self._spotlight = QRectF(rect.topLeft() - self.pos(), rect.size())
         self.update()
 
     def set_fill_color(self, color: QColor) -> None:
@@ -698,7 +809,35 @@ class SpotlightItem(QGraphicsItem):
         return self._fill_alpha
 
     def boundingRect(self) -> QRectF:
-        return self._overlay
+        return self._overlay.united(self._spotlight)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.setSelected(True)
+            if self._spotlight.contains(event.pos()):
+                self._dragging = True
+                self._drag_start = QPointF(event.pos())
+                self._spotlight_start = QRectF(self._spotlight)
+            event.accept()
+        else:
+            event.ignore()
+
+    def mouseMoveEvent(self, event) -> None:
+        if self._dragging:
+            delta = event.pos() - self._drag_start
+            self.prepareGeometryChange()
+            self._spotlight = self._spotlight_start.translated(delta)
+            self.update()
+            event.accept()
+        else:
+            event.ignore()
+
+    def mouseReleaseEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton and self._dragging:
+            self._dragging = False
+            event.accept()
+        else:
+            event.ignore()
 
     def paint(self, painter: QPainter, option, widget=None) -> None:
         painter.setPen(Qt.PenStyle.NoPen)
@@ -706,15 +845,23 @@ class SpotlightItem(QGraphicsItem):
         ox, oy, ow, oh = self._overlay.x(), self._overlay.y(), self._overlay.width(), self._overlay.height()
         sx, sy, sw, sh = self._spotlight.x(), self._spotlight.y(), self._spotlight.width(), self._spotlight.height()
         # Top
-        painter.drawRect(ox, oy, ow, sy - oy)
+        top_h = max(0.0, sy - oy)
+        painter.drawRect(ox, oy, ow, top_h)
         # Bottom
-        painter.drawRect(ox, sy + sh, ow, oy + oh - (sy + sh))
-        # Left
-        painter.drawRect(ox, sy, sx - ox, sh)
+        bottom_y = max(oy, sy + sh)
+        bottom_h = max(0.0, oy + oh - bottom_y)
+        painter.drawRect(ox, bottom_y, ow, bottom_h)
+        # Left (only the part between top and bottom strips)
+        left_y = max(oy, sy)
+        left_h = max(0.0, min(oy + oh, sy + sh) - left_y)
+        painter.drawRect(ox, left_y, max(0.0, sx - ox), left_h)
         # Right
-        painter.drawRect(sx + sw, sy, ox + ow - (sx + sw), sh)
+        right_x = max(ox, sx + sw)
+        right_w = max(0.0, ox + ow - right_x)
+        painter.drawRect(right_x, left_y, right_w, left_h)
         if self.isSelected():
             painter.setPen(QPen(QColor("#7E9CD8"), 1, Qt.PenStyle.DashLine))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRect(self._spotlight.adjusted(-2, -2, 2, 2))
 
 
@@ -732,6 +879,12 @@ class BlurItem(QGraphicsItem):
             | QGraphicsItem.GraphicsItemFlag.ItemIsMovable
         )
         self.setZValue(0.9)
+
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
 
     def boundingRect(self) -> QRectF:
         return self._rect.adjusted(-self._pad, -self._pad, self._pad, self._pad)
@@ -800,6 +953,12 @@ class MagnifierCalloutItem(QGraphicsItem):
         self.setZValue(1)
         # PySide6 itemChange doesn't fire for position changes, so we poll
         self._pos_watcher = _MagnifierPosWatcher(self)
+
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
 
     def set_line_color(self, color: QColor) -> None:
         self._line_color = QColor(color)
@@ -930,6 +1089,12 @@ class ShapeItem(QGraphicsItem):
             | QGraphicsItem.GraphicsItemFlag.ItemIsMovable
         )
         self.setZValue(1)
+
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
 
     def setRect(self, rect: QRectF) -> None:
         self.prepareGeometryChange()
@@ -1117,6 +1282,12 @@ class EmojiItem(QGraphicsItem):
         )
         self.setZValue(1)
 
+    def itemChange(self, change, value):
+        snapped = _snap_item_change(self, change, value)
+        if snapped is not None:
+            return snapped
+        return super().itemChange(change, value)
+
     def setRect(self, rect: QRectF) -> None:
         self.prepareGeometryChange()
         self._rect = QRectF(rect)
@@ -1173,6 +1344,57 @@ class CanvasImageItem(QGraphicsPixmapItem):
             path.addRoundedRect(self.boundingRect(), self._corner_radius, self._corner_radius)
             painter.setClipPath(path)
         super().paint(painter, option, widget)
+
+
+class EyedropperItem(QGraphicsItem):
+    """Magnifying glass for the eyedropper colour picker tool."""
+
+    def __init__(self, radius: float = 50, zoom: int = 6, parent=None) -> None:
+        super().__init__(parent)
+        self._radius = radius
+        self._zoom = zoom
+        self._pixmap = QPixmap()
+        self._color = QColor()
+        self.setZValue(100)
+
+    def set_data(self, center: QPointF, pixmap: QPixmap, color: QColor) -> None:
+        self.setPos(center)
+        self._pixmap = pixmap
+        self._color = color
+        self.update()
+
+    def boundingRect(self) -> QRectF:
+        r = self._radius + 2
+        return QRectF(-r, -r, r * 2, r * 2)
+
+    def paint(self, painter: QPainter, option, widget=None) -> None:
+        clip = QPainterPath()
+        clip.addEllipse(QPointF(0, 0), self._radius, self._radius)
+        painter.setClipPath(clip)
+        if not self._pixmap.isNull():
+            painter.drawPixmap(-self._pixmap.width() // 2, -self._pixmap.height() // 2, self._pixmap)
+        painter.setClipping(False)
+
+        painter.setPen(QPen(Qt.GlobalColor.white, 1.5))
+        painter.drawLine(QPointF(-self._radius, 0), QPointF(self._radius, 0))
+        painter.drawLine(QPointF(0, -self._radius), QPointF(0, self._radius))
+
+        painter.setPen(QPen(QColor("#1F1F28"), 2.5))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(QPointF(0, 0), self._radius, self._radius)
+
+        text = f"{self._color.name().upper()}  {self._color.red()},{self._color.green()},{self._color.blue()},{self._color.alpha()}"
+        font = QFont("Inter", 9)
+        painter.setFont(font)
+        fm = painter.fontMetrics()
+        tw = fm.horizontalAdvance(text)
+        th = fm.height()
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#1F1F28"))
+        bg_rect = QRectF(-tw / 2 - 4, self._radius + 4, tw + 8, th + 4)
+        painter.drawRoundedRect(bg_rect, 4, 4)
+        painter.setPen(QPen(QColor("#DCD7BA"), 1))
+        painter.drawText(int(-tw / 2), int(self._radius + 4 + th - fm.descent()), text)
 
 
 class CropOverlayItem(QGraphicsItem):

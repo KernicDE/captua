@@ -38,3 +38,5 @@ env/
 # Misc
 .DS_Store
 docs/superpowers/
+@eaDir/
+*.sync-conflict-*

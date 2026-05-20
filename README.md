@@ -13,10 +13,13 @@ A fast, lightweight screenshot annotation tool for **Linux / Wayland**.
 - **Window capture** via `grim` + `hyprctl` (Hyprland)
 - **Frameless overlay** with `QGraphicsScene` canvas
 - **Zoom** (`Ctrl` + scroll) and **pan** (middle-click drag)
-- **Annotations** — rectangles, circles, arrows, pen, marker, text, labels, emojis, shapes, blur, magnifier, ruler, spotlight, numbering
+- **Annotations** — rectangles, circles, arrows, pen, marker, text, labels, emojis, shapes, blur, magnifier, ruler, spotlight, numbering, eyedropper
 - **Clipboard** (`Ctrl+C`) and **save** (`Ctrl+S`) support
 - **Undo / redo**, layer ordering, drag & drop, paste from clipboard
-- **Backdrop settings** — padding, colors, gradients, corner radius
+- **Magnetic snap** — edges and centerlines align automatically while drawing and moving
+- **Shift constraints** — hold Shift to force squares, circles, 45° lines, straight strokes
+- **Backdrop settings** — padding, colors, gradients, corner radius, angle dial
+- **Auto-updater** — checks for new releases on startup and self-updates from git
 
 ## Install
 
@@ -209,6 +212,7 @@ captua --window
 | `Ctrl + V` | Paste image from clipboard |
 | `Ctrl + Z` | Undo |
 | `Ctrl + Shift + Z` / `Ctrl + Y` | Redo |
+| `?` | Toggle keyboard-shortcut overlay |
 | `Ctrl + Wheel` | Zoom |
 | `Middle-click drag` | Pan |
 | `Delete` / `Backspace` | Remove selected items |

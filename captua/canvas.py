@@ -1,5 +1,7 @@
 """High-performance canvas built on QGraphicsScene."""
 
+import math
+
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (
     QColor,
@@ -23,9 +25,95 @@ from PySide6.QtWidgets import (
     QGraphicsView,
     QLabel,
 )
+from PySide6.QtCore import QTimer
 
 from .history import History, RemoveItemCommand
 from .items import CanvasImageItem, MagnifierCalloutItem
+
+
+def snap_point(scene: "CanvasScene", point: QPointF, exclude_item=None, tolerance: float = 15.0) -> QPointF:
+    """Snap a point to edges and corners of other items in the scene."""
+    if not getattr(scene, "snap_enabled", True):
+        return point
+
+    x_targets = []
+    y_targets = []
+    corners = []
+
+    for item in scene.items():
+        if item is exclude_item:
+            continue
+        if not item.isVisible():
+            continue
+        rect = item.mapRectToScene(item.boundingRect())
+        x_targets.extend([rect.left(), rect.center().x(), rect.right()])
+        y_targets.extend([rect.top(), rect.center().y(), rect.bottom()])
+        corners.extend([rect.topLeft(), rect.topRight(), rect.bottomLeft(), rect.bottomRight()])
+
+    snapped_x = point.x()
+    snapped_y = point.y()
+
+    # Corner snapping takes priority
+    for corner in corners:
+        dx = abs(point.x() - corner.x())
+        dy = abs(point.y() - corner.y())
+        if dx <= tolerance and dy <= tolerance:
+            return QPointF(corner.x(), corner.y())
+
+    # Edge snapping independently for x and y
+    best_dx = tolerance + 1
+    for tx in x_targets:
+        d = abs(point.x() - tx)
+        if d < best_dx:
+            best_dx = d
+            snapped_x = tx
+
+    best_dy = tolerance + 1
+    for ty in y_targets:
+        d = abs(point.y() - ty)
+        if d < best_dy:
+            best_dy = d
+            snapped_y = ty
+
+    return QPointF(snapped_x, snapped_y)
+
+
+def snap_rect(scene: "CanvasScene", rect: QRectF, exclude_item=None, tolerance: float = 15.0) -> QPointF:
+    """Return a position delta that aligns rect edges to edges/centerlines of other items."""
+    if not getattr(scene, "snap_enabled", True):
+        return QPointF(0, 0)
+
+    x_targets = []
+    y_targets = []
+
+    for item in scene.items():
+        if item is exclude_item:
+            continue
+        if not item.isVisible():
+            continue
+        r = item.mapRectToScene(item.boundingRect())
+        x_targets.extend([r.left(), r.center().x(), r.right()])
+        y_targets.extend([r.top(), r.center().y(), r.bottom()])
+
+    delta_x = 0.0
+    best_dx = tolerance + 1
+    for tx in x_targets:
+        for mx in (rect.left(), rect.center().x(), rect.right()):
+            d = abs(mx - tx)
+            if d < best_dx:
+                best_dx = d
+                delta_x = tx - mx
+
+    delta_y = 0.0
+    best_dy = tolerance + 1
+    for ty in y_targets:
+        for my in (rect.top(), rect.center().y(), rect.bottom()):
+            d = abs(my - ty)
+            if d < best_dy:
+                best_dy = d
+                delta_y = ty - my
+
+    return QPointF(delta_x, delta_y)
 
 
 def draw_backdrop(painter: QPainter, scene: "CanvasScene", images_rect: QRectF) -> None:
@@ -40,7 +128,14 @@ def draw_backdrop(painter: QPainter, scene: "CanvasScene", images_rect: QRectF) 
     r = images_rect.adjusted(-pad, -pad, pad, pad)
     painter.setPen(Qt.PenStyle.NoPen)
     if scene.backdrop_use_gradient:
-        grad = QLinearGradient(r.topLeft(), r.bottomRight())
+        center = r.center()
+        half_diag = math.hypot(r.width(), r.height()) / 2
+        angle_rad = math.radians(getattr(scene, "backdrop_gradient_angle", 45))
+        start_x = center.x() - math.cos(angle_rad) * half_diag
+        start_y = center.y() - math.sin(angle_rad) * half_diag
+        end_x = center.x() + math.cos(angle_rad) * half_diag
+        end_y = center.y() + math.sin(angle_rad) * half_diag
+        grad = QLinearGradient(start_x, start_y, end_x, end_y)
         grad.setColorAt(0, scene.backdrop_gradient_start)
         grad.setColorAt(1, scene.backdrop_gradient_end)
         painter.setBrush(grad)
@@ -72,8 +167,10 @@ class CanvasScene(QGraphicsScene):
         self.backdrop_use_gradient = False
         self.backdrop_gradient_start = QColor("#2A2A37")
         self.backdrop_gradient_end = QColor("#1F1F28")
+        self.backdrop_gradient_angle = 45.0
         self.backdrop_corner_radius = 0.0
         self.canvas_corner_radius = 0.0
+        self.snap_enabled = True
 
     def history(self) -> History:
         return self._history
@@ -177,6 +274,13 @@ class CanvasView(QGraphicsView):
         # Shortcut overlay
         self._shortcut_overlay: QLabel | None = None
         self._hint_shown = False
+
+        # Snap workaround: itemChange return value is ignored by PySide6,
+        # so we apply the snapped position asynchronously via a timer.
+        self._pending_snaps: dict = {}
+        self._snap_apply_timer = QTimer(self)
+        self._snap_apply_timer.setSingleShot(True)
+        self._snap_apply_timer.timeout.connect(self._apply_pending_snaps)
 
         self.setRenderHints(
             QPainter.RenderHint.Antialiasing
@@ -289,9 +393,32 @@ class CanvasView(QGraphicsView):
         }
         return mapping.get(handle, Qt.CursorShape.ArrowCursor)
 
+    def _schedule_item_snap(self, item: QGraphicsItem, pos: QPointF) -> None:
+        """Queue an item position to be snapped on the next timer tick."""
+        if getattr(self, '_applying_snaps', False):
+            return
+        if item in self._pending_snaps and (self._pending_snaps[item] - pos).manhattanLength() < 0.5:
+            return
+        self._pending_snaps[item] = pos
+        self._snap_apply_timer.start(0)
+
+    def _apply_pending_snaps(self) -> None:
+        """Apply queued snapped positions to items."""
+        self._applying_snaps = True
+        try:
+            for item, pos in list(self._pending_snaps.items()):
+                if item.scene() is not None and (item.pos() - pos).manhattanLength() > 0.5:
+                    item.setPos(pos)
+        finally:
+            self._applying_snaps = False
+        self._pending_snaps.clear()
+
     def _do_resize(self, scene_pos: QPointF) -> None:
         item = self._resize_item
         handle = self._resize_handle
+        scene = self.scene()
+        if scene is not None and getattr(scene, "snap_enabled", True):
+            scene_pos = snap_point(scene, scene_pos, item)
         local_pos = item.mapFromScene(scene_pos)
         r = self._resize_start_rect
         x1, y1, x2, y2 = r.left(), r.top(), r.right(), r.bottom()
@@ -468,7 +595,7 @@ class CanvasView(QGraphicsView):
         if event.button() == Qt.MouseButton.LeftButton and self._tool_handles_mouse():
             self._active_tool.mouse_release(event, self._scene_pos(event))
             event.accept()
-            if self._active_tool.__class__.__name__ not in ("SelectTool", "CropTool", "CounterTool"):
+            if self._active_tool.__class__.__name__ not in ("SelectTool", "CropTool", "CounterTool", "EyedropperTool"):
                 self.tool_finished.emit()
             self.scene()._expand_scene_if_needed()
             self.viewport().update()
@@ -551,6 +678,8 @@ class CanvasView(QGraphicsView):
             "<td><b>G</b></td><td>Magnifier</td></tr>"
             "<tr><td><b>S</b></td><td>Shape</td>"
             "<td><b>E</b></td><td>Emoji</td></tr>"
+            "<tr><td><b>D</b></td><td>Picker</td>"
+            "<td></td><td></td></tr>"
             "<tr><td><b>Ctrl+Z</b></td><td>Undo</td>"
             "<td><b>Ctrl+Y</b></td><td>Redo</td></tr>"
             "<tr><td><b>Ctrl+C</b></td><td>Copy & save</td>"
@@ -610,6 +739,7 @@ class CanvasView(QGraphicsView):
             Qt.Key.Key_I: "spotlight",
             Qt.Key.Key_B: "blur",
             Qt.Key.Key_G: "magnifier",
+            Qt.Key.Key_D: "eyedropper",
             Qt.Key.Key_S: "shape",
             Qt.Key.Key_E: "emoji",
         }

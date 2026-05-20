@@ -1,8 +1,10 @@
 """Backdrop settings — popup widget (no OK/Cancel, live changes)."""
 
-from PySide6.QtCore import QPoint, Qt
+import math
+
+from PySide6.QtCore import QPoint, QPointF, Qt, Signal
 from PySide6.QtCore import QEvent
-from PySide6.QtGui import QColor, QMouseEvent
+from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -67,6 +69,57 @@ _POPUP_STYLE = """
 """
 
 
+class _AngleDial(QWidget):
+    """Small circular dial for picking a gradient angle."""
+
+    angle_changed = Signal(float)
+
+    def __init__(self, angle: float = 45.0, parent=None) -> None:
+        super().__init__(parent)
+        self._angle = angle % 360
+        self.setFixedSize(56, 56)
+        self.setCursor(Qt.CursorShape.CrossCursor)
+
+    def angle(self) -> float:
+        return self._angle
+
+    def set_angle(self, angle: float) -> None:
+        self._angle = angle % 360
+        self.update()
+        self.angle_changed.emit(self._angle)
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        cx, cy = self.width() / 2, self.height() / 2
+        radius = min(cx, cy) - 6
+        painter.setPen(QPen(QColor("#F4F4F5"), 1.5))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(QPointF(cx, cy), radius, radius)
+        angle_rad = math.radians(self._angle)
+        ex = cx + math.cos(angle_rad) * (radius - 2)
+        ey = cy - math.sin(angle_rad) * (radius - 2)
+        painter.drawLine(QPointF(cx, cy), QPointF(ex, ey))
+        # Small dot at the tip
+        painter.setBrush(QColor("#7E9CD8"))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(QPointF(ex, ey), 3, 3)
+        painter.end()
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        self._update_from_pos(event.pos())
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        self._update_from_pos(event.pos())
+
+    def _update_from_pos(self, pos: QPoint) -> None:
+        cx, cy = self.width() / 2, self.height() / 2
+        dx = pos.x() - cx
+        dy = cy - pos.y()
+        angle = math.degrees(math.atan2(dy, dx))
+        self.set_angle(angle)
+
+
 class BackdropPopup(QWidget):
     """Popup panel for backdrop settings — appears below toolbar button, live preview."""
 
@@ -128,11 +181,15 @@ class BackdropPopup(QWidget):
         self._grad_start_btn.color_changed.connect(self._apply)
         self._grad_end_btn = ColorSwatch(QColor(scene.backdrop_gradient_end))
         self._grad_end_btn.color_changed.connect(self._apply)
+        self._angle_dial = _AngleDial(getattr(scene, "backdrop_gradient_angle", 45))
+        self._angle_dial.angle_changed.connect(self._apply)
         grad_row.addWidget(QLabel("From:"))
         grad_row.addWidget(self._grad_start_btn)
         grad_row.addSpacing(8)
         grad_row.addWidget(QLabel("To:"))
         grad_row.addWidget(self._grad_end_btn)
+        grad_row.addSpacing(12)
+        grad_row.addWidget(self._angle_dial)
         grad_row.addStretch()
         self._grad_row_widget = QWidget()
         self._grad_row_widget.setLayout(grad_row)
@@ -199,6 +256,7 @@ class BackdropPopup(QWidget):
             self._scene.backdrop_use_gradient = True
             self._scene.backdrop_gradient_start = self._grad_start_btn.color()
             self._scene.backdrop_gradient_end = self._grad_end_btn.color()
+            self._scene.backdrop_gradient_angle = self._angle_dial.angle()
         else:
             self._scene.backdrop_use_gradient = False
             self._scene.backdrop_color = self._color_btn.color()
