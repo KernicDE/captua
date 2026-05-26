@@ -3,6 +3,10 @@
 # Pixels of checkerboard visible around the scene/backdrop when the window opens.
 _VIEWPORT_MARGIN = 50
 
+import os
+import shutil
+import subprocess
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -530,7 +534,32 @@ class OverlayWindow(QMainWindow):
         pixmap = self.render_to_pixmap()
         clipboard = QApplication.clipboard()
         if clipboard is not None:
-            clipboard.setPixmap(pixmap)
+            # Use setImage instead of setPixmap — it is more reliable on Wayland
+            clipboard.setImage(pixmap.toImage())
+
+        # Wayland fallback: if wl-copy is available, also push the image via
+        # the standard xdg-desktop-portal path so it survives app exit.
+        if shutil.which("wl-copy"):
+            tmp_path = ""
+            try:
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+                    tmp_path = f.name
+                pixmap.save(tmp_path, "PNG")
+                with open(tmp_path, "rb") as f:
+                    subprocess.run(
+                        ["wl-copy", "--type", "image/png"],
+                        stdin=f,
+                        check=False,
+                        capture_output=True,
+                    )
+            except Exception:
+                pass
+            finally:
+                if tmp_path:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
 
         auto_save = self._settings.get("auto_save_on_copy", True)
         if auto_save:
