@@ -3,10 +3,13 @@
 # Pixels of checkerboard visible around the scene/backdrop when the window opens.
 _VIEWPORT_MARGIN = 50
 
+import shutil
+import subprocess
+import threading
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
+from PySide6.QtCore import QBuffer, QIODevice, QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -46,6 +49,28 @@ from .tools import (
     TextTool,
     ToolProperties,
 )
+
+
+def _copy_via_wl_copy(pixmap: QPixmap) -> None:
+    """Push image to the Wayland clipboard via wl-copy in a background thread."""
+    try:
+        buffer = QBuffer()
+        buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+        pixmap.save(buffer, "PNG")
+        png_data = bytes(buffer.data())
+        buffer.close()
+
+        proc = subprocess.Popen(
+            ["wl-copy", "--type", "image/png"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        proc.stdin.write(png_data)
+        proc.stdin.close()
+        proc.wait(timeout=5)
+    except Exception:
+        pass
 
 
 class ToolbarScrollArea(QScrollArea):
@@ -530,7 +555,17 @@ class OverlayWindow(QMainWindow):
         pixmap = self.render_to_pixmap()
         clipboard = QApplication.clipboard()
         if clipboard is not None:
-            clipboard.setPixmap(pixmap)
+            # Use setImage instead of setPixmap — it is more reliable on Wayland
+            clipboard.setImage(pixmap.toImage())
+
+        # Wayland: keep image in clipboard after app exits by spawning wl-copy
+        # asynchronously so it never blocks the UI thread.
+        if shutil.which("wl-copy"):
+            threading.Thread(
+                target=_copy_via_wl_copy,
+                args=(pixmap,),
+                daemon=True,
+            ).start()
 
         auto_save = self._settings.get("auto_save_on_copy", True)
         if auto_save:
