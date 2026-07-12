@@ -193,6 +193,14 @@ class CanvasScene(QGraphicsScene):
         """Return the current base image item, or None."""
         return self._base_item
 
+    def content_rect(self) -> QRectF:
+        """Bounding rect of all items without the decorative backdrop padding.
+
+        Used for window sizing so the (user-configurable, up to 120px)
+        backdrop padding doesn't inflate the overlay window itself.
+        """
+        return QRectF(self._content_rect)
+
     def add_image(self, pixmap, pos=None) -> CanvasImageItem:
         """Add an additional image to the canvas."""
         item = CanvasImageItem(pixmap)
@@ -337,8 +345,8 @@ class CanvasView(QGraphicsView):
     def drawBackground(self, painter: QPainter, rect) -> None:
         # 1. Checkerboard
         cell = 20
-        c1 = QColor("#27272A")
-        c2 = QColor("#18181B")
+        c1 = QColor("#1A1A1A")
+        c2 = QColor("#0A0A0A")
         x_start = int(rect.left()) // cell * cell
         y_start = int(rect.top()) // cell * cell
         for y in range(y_start, int(rect.bottom()) + cell, cell):
@@ -470,8 +478,8 @@ class CanvasView(QGraphicsView):
         handle_size = max(8 / scale, 2)
         pen_width = max(1 / scale, 0.5)
         # White handle with accent border for better contrast
-        painter.setPen(QPen(QColor("#7E9CD8"), pen_width))
-        painter.setBrush(QColor("#F4F4F5"))
+        painter.setPen(QPen(QColor("#A07050"), pen_width))
+        painter.setBrush(QColor("#E8E8E8"))
         for item in self.scene().selectedItems():
             if not self._item_supports_resize(item):
                 continue
@@ -493,8 +501,8 @@ class CanvasView(QGraphicsView):
             if not isinstance(item, MagnifierCalloutItem):
                 continue
             dest = item.mapToScene(item._dest_c)
-            painter.setPen(QPen(QColor("#7E9CD8"), pen_width))
-            painter.setBrush(QColor("#F4F4F5"))
+            painter.setPen(QPen(QColor("#A07050"), pen_width))
+            painter.setBrush(QColor("#E8E8E8"))
             painter.drawRect(
                 dest.x() - handle_size / 2,
                 dest.y() - handle_size / 2,
@@ -656,7 +664,7 @@ class CanvasView(QGraphicsView):
 
         overlay = QLabel(self.viewport())
         overlay.setStyleSheet(
-            "background-color: rgba(24, 24, 27, 0.92); color: #F4F4F5; "
+            "background-color: rgba(10, 10, 10, 0.9); color: #E8E8E8; "
             "border-radius: 10px; padding: 16px; font-size: 13px; line-height: 1.6;"
         )
         text = (
@@ -819,7 +827,7 @@ class CanvasView(QGraphicsView):
                 self._hint_shown = True
                 hint = QLabel(self.viewport())
                 hint.setStyleSheet(
-                    "color: #71717A; font-size: 14px; background: transparent;"
+                    "color: #5A5A5A; font-size: 14px; background: transparent;"
                 )
                 hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 hint.setText("Click a tool to annotate  ·  Ctrl+C to copy & save")

@@ -29,7 +29,7 @@ class UpdateDialog(QWidget):
         self.setWindowTitle("Update Available")
         self.setFixedSize(520, 560)
         self.setStyleSheet(
-            "background-color: #18181B; color: #F4F4F5; font-family: Inter, sans-serif; font-size: 13px;"
+            "background-color: #0A0A0A; color: #E8E8E8; font-family: Inter, sans-serif; font-size: 13px;"
         )
 
         layout = QVBoxLayout(self)
@@ -38,12 +38,12 @@ class UpdateDialog(QWidget):
 
         # Header
         header = QLabel(f"<b>Captua v{version}</b> is available")
-        header.setStyleSheet("font-size: 18px; color: #F4F4F5;")
+        header.setStyleSheet("font-size: 18px; color: #E8E8E8;")
         header.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(header)
 
         sub = QLabel("A new version has been released. Would you like to update?")
-        sub.setStyleSheet("color: #A1A1AA; font-size: 13px;")
+        sub.setStyleSheet("color: #A0A0A0; font-size: 13px;")
         sub.setWordWrap(True)
         layout.addWidget(sub)
 
@@ -57,8 +57,8 @@ class UpdateDialog(QWidget):
         changelog_widget.setReadOnly(True)
         changelog_widget.setPlainText(changelog)
         changelog_widget.setStyleSheet(
-            "QTextEdit { background-color: #27272A; color: #F4F4F5; "
-            "border: 1px solid #3F3F46; border-radius: 8px; padding: 10px; "
+            "QTextEdit { background-color: #1A1A1A; color: #E8E8E8; "
+            "border: 1px solid #2A2A2A; border-radius: 10px; padding: 10px; "
             "font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }"
         )
         changelog_widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -73,15 +73,15 @@ class UpdateDialog(QWidget):
         self._progress.setRange(0, 0)  # indeterminate
         self._progress.setTextVisible(False)
         self._progress.setStyleSheet(
-            "QProgressBar { background-color: #27272A; border: 1px solid #3F3F46; "
+            "QProgressBar { background-color: #1A1A1A; border: 1px solid #2A2A2A; "
             "border-radius: 4px; height: 6px; }"
-            "QProgressBar::chunk { background-color: #7E9CD8; border-radius: 4px; }"
+            "QProgressBar::chunk { background-color: #A07050; border-radius: 4px; }"
         )
         self._progress.hide()
         layout.addWidget(self._progress)
 
         self._status = QLabel("")
-        self._status.setStyleSheet("color: #A1A1AA; font-size: 12px;")
+        self._status.setStyleSheet("color: #A0A0A0; font-size: 12px;")
         self._status.hide()
         layout.addWidget(self._status)
 
@@ -92,8 +92,8 @@ class UpdateDialog(QWidget):
         self._update_btn = QPushButton("Update Now")
         self._update_btn.setFixedHeight(36)
         self._update_btn.setStyleSheet(
-            "QPushButton { background-color: #7E9CD8; color: #18181B; "
-            "border: none; border-radius: 8px; font-weight: bold; font-size: 13px; padding: 0 16px; }"
+            "QPushButton { background-color: #A07050; color: #0A0A0A; "
+            "border: none; border-radius: 10px; font-weight: bold; font-size: 13px; padding: 0 16px; }"
             "QPushButton:hover { background-color: #9ABAE8; }"
             "QPushButton:pressed { background-color: #5A7FB8; }"
         )
@@ -104,10 +104,10 @@ class UpdateDialog(QWidget):
         self._later_btn = QPushButton("Ask Again Later")
         self._later_btn.setFixedHeight(36)
         self._later_btn.setStyleSheet(
-            "QPushButton { background-color: #27272A; color: #F4F4F5; "
-            "border: 1px solid #3F3F46; border-radius: 8px; font-size: 13px; padding: 0 16px; }"
-            "QPushButton:hover { background-color: #3F3F46; border-color: #52525B; }"
-            "QPushButton:pressed { background-color: #52525B; }"
+            "QPushButton { background-color: #1A1A1A; color: #E8E8E8; "
+            "border: 1px solid #2A2A2A; border-radius: 10px; font-size: 13px; padding: 0 16px; }"
+            "QPushButton:hover { background-color: #2A2A2A; border-color: #303030; }"
+            "QPushButton:pressed { background-color: #303030; }"
         )
         self._later_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._later_btn.clicked.connect(self._on_later)
@@ -116,10 +116,10 @@ class UpdateDialog(QWidget):
         self._skip_btn = QPushButton("Skip This Version")
         self._skip_btn.setFixedHeight(36)
         self._skip_btn.setStyleSheet(
-            "QPushButton { background-color: transparent; color: #A1A1AA; "
-            "border: 1px solid #3F3F46; border-radius: 8px; font-size: 13px; padding: 0 16px; }"
-            "QPushButton:hover { background-color: #27272A; color: #F4F4F5; border-color: #52525B; }"
-            "QPushButton:pressed { background-color: #3F3F46; }"
+            "QPushButton { background-color: transparent; color: #A0A0A0; "
+            "border: 1px solid #2A2A2A; border-radius: 10px; font-size: 13px; padding: 0 16px; }"
+            "QPushButton:hover { background-color: #1A1A1A; color: #E8E8E8; border-color: #303030; }"
+            "QPushButton:pressed { background-color: #2A2A2A; }"
         )
         self._skip_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._skip_btn.clicked.connect(self._on_skip)

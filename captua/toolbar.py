@@ -19,56 +19,56 @@ from .popups import EmojiPopup, MagnifierPopup, ShapePopup
 
 _TOOL_BTN_STYLE = """
     QPushButton {
-        background-color: #27272A;
-        color: #A1A1AA;
-        border: 1px solid #3F3F46;
-        border-radius: 8px;
+        background-color: #1A1A1A;
+        color: #A0A0A0;
+        border: 1px solid #2A2A2A;
+        border-radius: 10px;
         font-size: 14px;
     }
     QPushButton:hover {
-        background-color: #3F3F46;
-        border: 1px solid #52525B;
-        color: #F4F4F5;
+        background-color: #2A2A2A;
+        border: 1px solid #303030;
+        color: #E8E8E8;
     }
     QPushButton:pressed {
-        background-color: #52525B;
+        background-color: #303030;
     }
 """
 
 _ACTION_BTN_STYLE = """
     QPushButton {
         background-color: transparent;
-        color: #A1A1AA;
+        color: #A0A0A0;
         border: none;
         border-radius: 6px;
         font-size: 13px;
         padding: 2px 4px;
     }
     QPushButton:hover {
-        background-color: #3F3F46;
-        color: #F4F4F5;
+        background-color: #2A2A2A;
+        color: #E8E8E8;
     }
     QPushButton:pressed {
-        background-color: #52525B;
+        background-color: #303030;
     }
     QPushButton:checked {
-        background-color: #2D4F67;
-        color: #F4F4F5;
-        border: 1px solid #7E9CD8;
+        background-color: #5C3A2E;
+        color: #E8E8E8;
+        border: 1px solid #A07050;
     }
 """
 
 _EDIT_STYLE = """
     QLineEdit {
-        background-color: #27272A;
-        color: #F4F4F5;
-        border: 1px solid #3F3F46;
+        background-color: #1A1A1A;
+        color: #E8E8E8;
+        border: 1px solid #2A2A2A;
         border-radius: 4px;
         padding: 0 2px;
         font-size: 12px;
     }
     QLineEdit:focus {
-        border: 1px solid #7E9CD8;
+        border: 1px solid #A07050;
     }
 """
 
@@ -77,7 +77,7 @@ def _make_separator() -> QFrame:
     sep = QFrame()
     sep.setFrameShape(QFrame.Shape.VLine)
     sep.setFixedWidth(1)
-    sep.setStyleSheet("QFrame { background-color: #3F3F46; border: none; }")
+    sep.setStyleSheet("QFrame { background-color: #2A2A2A; border: none; }")
     return sep
 
 
@@ -91,9 +91,9 @@ class ToolButton(QPushButton):
         self.setFixedSize(32, 32)
         self.setStyleSheet(_TOOL_BTN_STYLE + """
             QPushButton:checked {
-                background-color: #2D4F67;
-                border: 1px solid #7E9CD8;
-                color: #F4F4F5;
+                background-color: #5C3A2E;
+                border: 1px solid #A07050;
+                color: #E8E8E8;
             }
         """)
         self.setToolTip(f"{name} ({shortcut})")
@@ -127,11 +127,11 @@ class ColorSwatch(QPushButton):
         self.setStyleSheet(f"""
             QPushButton {{
                 background-color: {c};
-                border: 2px solid #71717A;
+                border: 2px solid #5A5A5A;
                 border-radius: 12px;
             }}
             QPushButton:hover {{
-                border: 2px solid #F4F4F5;
+                border: 2px solid #E8E8E8;
             }}
         """)
 
@@ -173,7 +173,7 @@ class Toolbar(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setFixedHeight(76)
-        self.setStyleSheet("background-color: #18181B;")
+        self.setStyleSheet("background-color: #0A0A0A;")
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(6, 4, 6, 4)

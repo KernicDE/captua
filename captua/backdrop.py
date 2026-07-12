@@ -23,18 +23,18 @@ from .toolbar import ColorSwatch
 
 _POPUP_STYLE = """
     QFrame#backdrop_frame {
-        background-color: #27272A;
-        border: 1px solid #3F3F46;
-        border-radius: 8px;
+        background-color: #1A1A1A;
+        border: 1px solid #2A2A2A;
+        border-radius: 10px;
     }
     QLabel {
-        color: #F4F4F5;
+        color: #E8E8E8;
         font-size: 12px;
         background: transparent;
         border: none;
     }
     QCheckBox {
-        color: #F4F4F5;
+        color: #E8E8E8;
         font-size: 12px;
         background: transparent;
         border: none;
@@ -43,27 +43,27 @@ _POPUP_STYLE = """
         width: 14px;
         height: 14px;
         border-radius: 3px;
-        border: 1px solid #3F3F46;
-        background: #18181B;
+        border: 1px solid #2A2A2A;
+        background: #0A0A0A;
     }
     QCheckBox::indicator:checked {
-        background: #7E9CD8;
-        border-color: #7E9CD8;
+        background: #A07050;
+        border-color: #A07050;
     }
     QSlider::groove:horizontal {
         height: 4px;
-        background: #3F3F46;
+        background: #2A2A2A;
         border-radius: 2px;
     }
     QSlider::handle:horizontal {
-        background: #7E9CD8;
+        background: #A07050;
         width: 14px;
         height: 14px;
         border-radius: 7px;
         margin: -5px 0;
     }
     QSlider::sub-page:horizontal {
-        background: #7E9CD8;
+        background: #A07050;
         border-radius: 2px;
     }
 """
@@ -93,7 +93,7 @@ class _AngleDial(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         cx, cy = self.width() / 2, self.height() / 2
         radius = min(cx, cy) - 6
-        painter.setPen(QPen(QColor("#F4F4F5"), 1.5))
+        painter.setPen(QPen(QColor("#E8E8E8"), 1.5))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawEllipse(QPointF(cx, cy), radius, radius)
         angle_rad = math.radians(self._angle)
@@ -101,7 +101,7 @@ class _AngleDial(QWidget):
         ey = cy - math.sin(angle_rad) * (radius - 2)
         painter.drawLine(QPointF(cx, cy), QPointF(ex, ey))
         # Small dot at the tip
-        painter.setBrush(QColor("#7E9CD8"))
+        painter.setBrush(QColor("#A07050"))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(QPointF(ex, ey), 3, 3)
         painter.end()

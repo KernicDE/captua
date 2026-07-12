@@ -130,61 +130,61 @@ class _ColorDisc(QWidget):
 
 _DIALOG_STYLE = """
     QDialog {
-        background-color: #18181B;
+        background-color: #0A0A0A;
     }
     QPushButton {
-        background-color: #27272A;
-        color: #F4F4F5;
-        border: 1px solid #3F3F46;
+        background-color: #1A1A1A;
+        color: #E8E8E8;
+        border: 1px solid #2A2A2A;
         border-radius: 6px;
         padding: 6px 12px;
         font-weight: bold;
     }
     QPushButton:hover {
-        background-color: #3F3F46;
-        border: 1px solid #52525B;
+        background-color: #2A2A2A;
+        border: 1px solid #303030;
     }
     QPushButton:pressed {
-        background-color: #52525B;
+        background-color: #303030;
     }
     QSlider::groove:horizontal {
         height: 6px;
-        background: #3F3F46;
+        background: #2A2A2A;
         border-radius: 3px;
     }
     QSlider::handle:horizontal {
         width: 14px;
         height: 14px;
-        background: #F4F4F5;
+        background: #E8E8E8;
         border-radius: 7px;
     }
 """
 
 _EDIT_STYLE = """
     QLineEdit {
-        background-color: #27272A;
-        color: #F4F4F5;
-        border: 1px solid #3F3F46;
+        background-color: #1A1A1A;
+        color: #E8E8E8;
+        border: 1px solid #2A2A2A;
         border-radius: 4px;
         padding: 0 4px;
         font-size: 12px;
     }
     QLineEdit:focus {
-        border: 1px solid #7E9CD8;
+        border: 1px solid #A07050;
     }
 """
 
 _SPIN_STYLE = """
     QSpinBox {
-        background-color: #27272A;
-        color: #F4F4F5;
-        border: 1px solid #3F3F46;
+        background-color: #1A1A1A;
+        color: #E8E8E8;
+        border: 1px solid #2A2A2A;
         border-radius: 4px;
         padding: 0 4px;
         font-size: 12px;
     }
     QSpinBox:focus {
-        border: 1px solid #7E9CD8;
+        border: 1px solid #A07050;
     }
     QSpinBox::up-button, QSpinBox::down-button {
         width: 0px;
@@ -227,7 +227,7 @@ class ColorWheelDialog(QDialog):
             row = QHBoxLayout()
             row.setSpacing(4)
             lbl = QLabel(label + ":")
-            lbl.setStyleSheet("color: #F4F4F5; font-weight: bold;")
+            lbl.setStyleSheet("color: #E8E8E8; font-weight: bold;")
             row.addWidget(lbl)
             row.addWidget(edit)
             rgb_layout.addLayout(row)
@@ -240,7 +240,7 @@ class ColorWheelDialog(QDialog):
         # Saturation slider
         sat_layout = QHBoxLayout()
         sat_label = QLabel("S:")
-        sat_label.setStyleSheet("color: #F4F4F5; font-weight: bold;")
+        sat_label.setStyleSheet("color: #E8E8E8; font-weight: bold;")
         sat_layout.addWidget(sat_label)
         self._sat_slider = QSlider(Qt.Orientation.Horizontal)
         self._sat_slider.setRange(0, 100)
@@ -249,7 +249,7 @@ class ColorWheelDialog(QDialog):
         self._sat_slider.valueChanged.connect(self._on_sat_changed)
         sat_layout.addWidget(self._sat_slider)
         self._sat_value = QLabel(f"{self._sat_slider.value()}%")
-        self._sat_value.setStyleSheet("color: #F4F4F5; min-width: 32px;")
+        self._sat_value.setStyleSheet("color: #E8E8E8; min-width: 32px;")
         sat_layout.addWidget(self._sat_value)
         layout.addLayout(sat_layout)
 
@@ -263,7 +263,7 @@ class ColorWheelDialog(QDialog):
         row.addWidget(self._preview)
 
         hex_label = QLabel("HEX:")
-        hex_label.setStyleSheet("color: #F4F4F5; font-weight: bold;")
+        hex_label.setStyleSheet("color: #E8E8E8; font-weight: bold;")
         row.addWidget(hex_label)
         self._hex_edit = QLineEdit(initial_color.name().upper())
         self._hex_edit.setStyleSheet(_EDIT_STYLE)
@@ -348,7 +348,7 @@ class ColorWheelDialog(QDialog):
         self._preview.setStyleSheet(f"""
             QLabel {{
                 background-color: {color.name()};
-                border: 2px solid #71717A;
+                border: 2px solid #5A5A5A;
                 border-radius: 14px;
             }}
         """)

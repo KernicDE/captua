@@ -28,7 +28,7 @@ _DIALOG_STYLE = """
     }
     QPushButton {
         background-color: #2A2A37;
-        color: #DCD7BA;
+        color: #A0A0A0;
         border: 1px solid #54546D;
         border-radius: 6px;
         padding: 6px 12px;
@@ -50,8 +50,8 @@ _BTN_STYLE = _DIALOG_STYLE + """
         min-height: 48px;
     }
     QPushButton:checked {
-        background-color: #2D4F67;
-        border: 1px solid #7E9CD8;
+        background-color: #5C3A2E;
+        border: 1px solid #A07050;
     }
 """
 

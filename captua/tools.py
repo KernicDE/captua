@@ -446,7 +446,7 @@ class BlurTool(Tool):
     def mouse_press(self, event: QMouseEvent, pos: QPointF) -> None:
         self._start = pos
         self._active_item = RectangleItem(
-            QRectF(pos, pos), QColor("#DCD7BA"), 1, 0
+            QRectF(pos, pos), QColor("#A0A0A0"), 1, 0
         )
         self._active_item.setZValue(1)
         self._active_item.setOpacity(0.5)
@@ -526,8 +526,8 @@ class MagnifierTool(Tool):
     def mouse_press(self, event: QMouseEvent, pos: QPointF) -> None:
         self._center = pos
         self._active_item = QGraphicsEllipseItem(QRectF(0, 0, 0, 0))
-        self._active_item.setPen(QPen(QColor("#7E9CD8"), 2))
-        self._active_item.setBrush(QColor("#7E9CD8"))
+        self._active_item.setPen(QPen(QColor("#A07050"), 2))
+        self._active_item.setBrush(QColor("#A07050"))
         self._active_item.setOpacity(0.3)
         self._active_item.setZValue(1)
         self.scene.addItem(self._active_item)
@@ -643,8 +643,8 @@ class EyedropperTool(Tool):
             return None
         overlay = QLabel(view.viewport())
         overlay.setStyleSheet(
-            "background-color: rgba(31,31,40,0.95); color: #DCD7BA; border-radius: 4px; "
-            "padding: 4px 8px; font-size: 11px; font-family: monospace; border: 1px solid #3F3F46;"
+            "background-color: rgba(20,20,20,0.95); color: #E8E8E8; border-radius: 6px; "
+            "padding: 4px 8px; font-size: 11px; font-family: monospace; border: 1px solid #2A2A2A;"
         )
         overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._overlay = overlay

@@ -67,18 +67,18 @@ _DIALOG_STYLE = """
     }
     QLineEdit {
         background-color: #2A2A37;
-        color: #DCD7BA;
+        color: #A0A0A0;
         border: 1px solid #54546D;
         border-radius: 6px;
         padding: 6px 10px;
         font-size: 16px;
     }
     QLineEdit:focus {
-        border: 1px solid #7E9CD8;
+        border: 1px solid #A07050;
     }
     QPushButton {
         background-color: #2A2A37;
-        color: #DCD7BA;
+        color: #A0A0A0;
         border: 1px solid #54546D;
         border-radius: 6px;
         padding: 4px;
@@ -144,7 +144,7 @@ class EmojiPickerDialog(QDialog):
         cancel_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2A2A37;
-                color: #DCD7BA;
+                color: #A0A0A0;
                 border: 1px solid #54546D;
                 border-radius: 6px;
                 padding: 6px 12px;

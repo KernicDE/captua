@@ -116,7 +116,7 @@ class OverlayWindow(QMainWindow):
         )
 
         # Background colour (dark, modern)
-        self.setStyleSheet("background-color: #18181B;")
+        self.setStyleSheet("background-color: #0A0A0A;")
         self.setAcceptDrops(True)
 
         # Central widget with vertical layout
@@ -126,18 +126,21 @@ class OverlayWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Toolbar wrapped in a scroll area so it doesn't force the window width
+        # Toolbar wrapped in a scroll area so it doesn't force the window width.
+        # Keep the window's hard minimum small; showEvent() grows the window
+        # towards the toolbar's preferred width but never past the available
+        # screen space, letting the toolbar scroll horizontally if needed.
         self._toolbar = Toolbar(self)
         self._toolbar_scroll = ToolbarScrollArea(self._toolbar, self)
         layout.addWidget(self._toolbar_scroll)
-        self.setMinimumWidth(self._toolbar.minimumSizeHint().width())
+        self.setMinimumWidth(280)
         self._backdrop_popup: BackdropPopup | None = None
 
         # Toast label for ephemeral status messages
         self._toast = QLabel(self)
         self._toast.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._toast.setStyleSheet(
-            "background-color: #27272A; color: #F4F4F5; border-radius: 6px; padding: 6px 12px; font-size: 12px;"
+            "background-color: #1A1A1A; color: #E8E8E8; border-radius: 6px; padding: 6px 12px; font-size: 12px;"
         )
         self._toast.hide()
 
@@ -372,27 +375,37 @@ class OverlayWindow(QMainWindow):
             self._toolbar.set_tool("select")
 
     def _screen_constraints(self) -> tuple[int, int, int, int]:
-        """Return (margin, max_w, max_h) for window sizing."""
+        """Return (margin, max_w, max_h) for window sizing.
+
+        Uses availableGeometry() rather than geometry() so bars/panels
+        (waybar, DankMaterialShell top bar, etc.) are excluded — the window
+        must never exceed the actually usable screen space. A fixed pixel
+        margin is also reserved on top of that so the window keeps a
+        visible floating gap instead of touching the available area's edges.
+        """
         try:
-            screen = self.screen().geometry()
+            available = self.screen().availableGeometry()
         except Exception:
-            screen = None
-        margin = 50
-        if screen is not None:
-            max_w = int(screen.width() * 0.9)
-            max_h = int(screen.height() * 0.9)
+            available = None
+        margin = 40
+        if available is not None:
+            max_w = available.width() - margin * 2
+            max_h = available.height() - margin * 2
         else:
             max_w = 1920
             max_h = 1080
         return margin, max_w, max_h
 
     def _resize_for_scene(self) -> None:
-        """Resize window to show scene rect plus checkerboard margin on all sides."""
+        """Resize window to the actual content (screenshot + annotations)
+        plus a fixed 50px margin and the toolbar height. Deliberately ignores
+        the scene's decorative backdrop padding (user-configurable, up to
+        120px) so backdrop settings never inflate the window itself."""
         _, max_w, max_h = self._screen_constraints()
-        scene_rect = self._scene.sceneRect()
-        needed_w = int(scene_rect.width()) + _VIEWPORT_MARGIN * 2
-        needed_h = int(scene_rect.height()) + 80 + _VIEWPORT_MARGIN * 2
-        new_w = max(needed_w, self.minimumWidth())
+        content_rect = self._scene.content_rect()
+        needed_w = int(content_rect.width()) + 50
+        needed_h = int(content_rect.height()) + 50 + 80
+        new_w = min(max(needed_w, self.minimumWidth()), max_w)
         new_h = min(max(needed_h, 0), max_h)
         self.resize(new_w, new_h)
 
@@ -401,11 +414,14 @@ class OverlayWindow(QMainWindow):
         pass
 
     def _on_scene_rect_fitted(self, old_rect: QRectF, new_rect: QRectF) -> None:
-        """Resize window to keep the new scene rect visible with checkerboard margin."""
+        """Resize window to keep growing content (e.g. an annotation drawn
+        past the image edge) visible — plus a fixed 50px margin and the
+        toolbar height, ignoring the decorative backdrop padding."""
         _, max_w, max_h = self._screen_constraints()
-        needed_w = int(new_rect.width()) + _VIEWPORT_MARGIN * 2
-        needed_h = int(new_rect.height()) + 80 + _VIEWPORT_MARGIN * 2
-        new_w = max(needed_w, self.minimumWidth())
+        content_rect = self._scene.content_rect()
+        needed_w = int(content_rect.width()) + 50
+        needed_h = int(content_rect.height()) + 50 + 80
+        new_w = min(max(needed_w, self.minimumWidth()), max_w)
         new_h = min(max(needed_h, 0), max_h)
         self.resize(new_w, new_h)
         self._view.viewport().update()
@@ -425,32 +441,44 @@ class OverlayWindow(QMainWindow):
             self._fit_image()
 
     def _fit_image(self) -> None:
-        """Show scene at 1:1 centered (margin visible) or scaled if screen-capped."""
-        scene_rect = self._scene.sceneRect()
+        """Show content at 1:1 centered (margin visible) or scaled if screen-capped.
+
+        Fits against the actual content (screenshot + annotations), not the
+        full sceneRect — the sceneRect also carries the decorative, user-
+        configurable backdrop padding (up to 120px), which must never force
+        the real screenshot to shrink just because the window (correctly
+        sized to content + 50px) is smaller than that padded sceneRect."""
+        content_rect = self._scene.content_rect()
         view_rect = self._view.viewport().rect()
-        if scene_rect.width() <= view_rect.width() and scene_rect.height() <= view_rect.height():
+        if content_rect.width() <= view_rect.width() and content_rect.height() <= view_rect.height():
             # Fits at 1:1 — window was sized with margin, so checkerboard shows around it
             self._view.resetTransform()
-            self._view.centerOn(scene_rect.center())
+            self._view.centerOn(content_rect.center())
         else:
             # Screen-capped window: scale to fit, keep margin where possible
             scale = min(
-                max((view_rect.width() - _VIEWPORT_MARGIN * 2), 1) / scene_rect.width(),
-                max((view_rect.height() - _VIEWPORT_MARGIN * 2), 1) / scene_rect.height(),
+                max((view_rect.width() - _VIEWPORT_MARGIN * 2), 1) / content_rect.width(),
+                max((view_rect.height() - _VIEWPORT_MARGIN * 2), 1) / content_rect.height(),
             )
             self._view.resetTransform()
             self._view.scale(scale, scale)
-            self._view.centerOn(scene_rect.center())
+            self._view.centerOn(content_rect.center())
 
     def showEvent(self, event) -> None:
         """Defer fitting until the viewport has a real size."""
         super().showEvent(event)
-        # Ensure the window is wide enough for the toolbar content
-        toolbar_w = self._toolbar.minimumSizeHint().width()
+        # Ensure the window is wide enough for the toolbar content, but never
+        # wider than the available screen space.
+        _, max_w, _ = self._screen_constraints()
+        toolbar_w = min(self._toolbar.minimumSizeHint().width(), max_w)
         if self.width() < toolbar_w:
             self.resize(toolbar_w, self.height())
         if self._scene.base_image() is not None:
             self._fit_image()
+        # Grab keyboard focus immediately so modifier keys (e.g. Ctrl for
+        # zoom) are recognised without requiring a click into the canvas first.
+        self.activateWindow()
+        self._view.setFocus(Qt.FocusReason.ActiveWindowFocusReason)
 
     def closeEvent(self, event) -> None:
         """Persist all current settings on window close."""
@@ -539,7 +567,7 @@ class OverlayWindow(QMainWindow):
             self._toast = QLabel(self)
             self._toast.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._toast.setStyleSheet(
-                "background-color: #27272A; color: #F4F4F5; border-radius: 6px; padding: 6px 12px; font-size: 12px;"
+                "background-color: #1A1A1A; color: #E8E8E8; border-radius: 6px; padding: 6px 12px; font-size: 12px;"
             )
         self._toast.setText(message)
         self._toast.adjustSize()

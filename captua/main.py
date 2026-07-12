@@ -28,9 +28,9 @@ def main() -> int:
     # Global tooltip style — bright text on dark background so tooltips are readable
     app.setStyleSheet("""
         QToolTip {
-            background-color: #27272A;
-            color: #F4F4F5;
-            border: 1px solid #3F3F46;
+            background-color: #1A1A1A;
+            color: #E8E8E8;
+            border: 1px solid #2A2A2A;
             padding: 4px 6px;
             border-radius: 4px;
             font-size: 12px;

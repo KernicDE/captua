@@ -89,25 +89,25 @@ class ShapePopup(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setStyleSheet("""
             QWidget {
-                background-color: #27272A;
-                border: 1px solid #3F3F46;
-                border-radius: 8px;
+                background-color: #1A1A1A;
+                border: 1px solid #2A2A2A;
+                border-radius: 10px;
             }
             QPushButton {
-                background-color: #3F3F46;
-                color: #F4F4F5;
-                border: 1px solid #52525B;
+                background-color: #2A2A2A;
+                color: #E8E8E8;
+                border: 1px solid #303030;
                 border-radius: 6px;
                 padding: 4px;
                 font-size: 20px;
             }
             QPushButton:hover {
-                background-color: #52525B;
-                border: 1px solid #F4F4F5;
+                background-color: #303030;
+                border: 1px solid #E8E8E8;
             }
             QPushButton:checked {
-                background-color: #2D4F67;
-                border: 1px solid #7E9CD8;
+                background-color: #5C3A2E;
+                border: 1px solid #A07050;
             }
         """)
         self.setFixedSize(200, 200)
@@ -151,9 +151,9 @@ class EmojiPopup(QWidget):
         container = QFrame(self)
         container.setStyleSheet("""
             QFrame {
-                background-color: #27272A;
-                border: 1px solid #3F3F46;
-                border-radius: 8px;
+                background-color: #1A1A1A;
+                border: 1px solid #2A2A2A;
+                border-radius: 10px;
             }
         """)
         inner = QVBoxLayout(container)
@@ -182,15 +182,15 @@ class EmojiPopup(QWidget):
             }
             QListView::item {
                 background-color: transparent;
-                color: #F4F4F5;
+                color: #E8E8E8;
             }
             QListView::item:hover {
-                background-color: #52525B;
+                background-color: #303030;
                 border-radius: 4px;
             }
             QListView::item:selected {
-                background-color: #2D4F67;
-                border: 1px solid #7E9CD8;
+                background-color: #5C3A2E;
+                border: 1px solid #A07050;
                 border-radius: 4px;
             }
         """)
@@ -235,28 +235,28 @@ class MagnifierPopup(QWidget):
         self.setFixedSize(180, 80)
         self.setStyleSheet("""
             QWidget {
-                background-color: #27272A;
-                border: 1px solid #3F3F46;
-                border-radius: 8px;
+                background-color: #1A1A1A;
+                border: 1px solid #2A2A2A;
+                border-radius: 10px;
             }
             QLabel {
-                color: #F4F4F5;
+                color: #E8E8E8;
                 font-size: 12px;
             }
             QSlider::groove:horizontal {
                 height: 4px;
-                background: #3F3F46;
+                background: #2A2A2A;
                 border-radius: 2px;
             }
             QSlider::handle:horizontal {
-                background: #7E9CD8;
+                background: #A07050;
                 width: 14px;
                 height: 14px;
                 border-radius: 7px;
                 margin: -5px 0;
             }
             QSlider::sub-page:horizontal {
-                background: #7E9CD8;
+                background: #A07050;
                 border-radius: 2px;
             }
         """)

@@ -5,8 +5,8 @@ from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QPixmap
 
 _ICON_SIZE = 20
 _STROKE = 1.5
-_COLOR = QColor("#DCD7BA")
-_COLOR_ACTIVE = QColor("#F4F4F5")
+_COLOR = QColor("#A0A0A0")
+_COLOR_ACTIVE = QColor("#E8E8E8")
 
 
 def _create_pixmap() -> QPixmap:

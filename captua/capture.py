@@ -1,6 +1,7 @@
 """Native screen capture via grim and slurp."""
 
 import json
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -74,7 +75,55 @@ def capture_screen() -> QPixmap:
         Path(tmp_path).unlink(missing_ok=True)
 
 
+def _is_niri() -> bool:
+    """Check whether Niri is the current compositor."""
+    return os.environ.get("XDG_CURRENT_DESKTOP", "").lower() == "niri"
+
+
 def capture_window() -> QPixmap:
+    """Capture the currently focused window (Hyprland or Niri)."""
+    if _is_niri():
+        return _capture_window_niri()
+    return _capture_window_hyprland()
+
+
+def _capture_window_niri() -> QPixmap:
+    """Capture the focused window under Niri.
+
+    Niri does not expose window absolute coordinates, so we let Niri take the
+    screenshot and then load the most recent file from the screenshots dir.
+    """
+    screenshots_dir = Path.home() / "Pictures" / "Screenshots"
+    screenshots_dir.mkdir(parents=True, exist_ok=True)
+
+    # Find the newest screenshot before Niri writes a new one.
+    before = max(
+        (p.stat().st_mtime for p in screenshots_dir.glob("*.png")),
+        default=0,
+    )
+
+    _run(["niri", "msg", "action", "screenshot-window"])
+
+    # Wait briefly for the file to appear.
+    new_path: Path | None = None
+    for _ in range(50):
+        candidates = [
+            p for p in screenshots_dir.glob("*.png")
+            if p.stat().st_mtime > before
+        ]
+        if candidates:
+            new_path = max(candidates, key=lambda p: p.stat().st_mtime)
+            break
+        import time
+        time.sleep(0.05)
+
+    if new_path is None:
+        raise RuntimeError("Niri did not write a screenshot file")
+
+    return _trim_border(_set_dpr(QPixmap(str(new_path))))
+
+
+def _capture_window_hyprland() -> QPixmap:
     """Capture the currently focused Hyprland window."""
     try:
         result = subprocess.run(
