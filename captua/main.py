@@ -1,6 +1,11 @@
 """Entry point for Captua."""
 
+import atexit
+import os
+import signal
 import sys
+import time
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -11,6 +16,54 @@ from .overlay import OverlayWindow
 from .settings import load_settings
 
 from . import __version__
+
+
+def _pid_file() -> Path:
+    """Per-user PID file used to enforce the single running instance."""
+    runtime = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
+    return Path(runtime) / f"captua-overlay-{os.getuid()}.pid"
+
+
+def _is_captua_process(pid: int) -> bool:
+    """Guard against killing an unrelated process that recycled the PID."""
+    try:
+        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except OSError:
+        return False
+    return b"captua" in cmdline
+
+
+def ensure_single_instance() -> None:
+    """Terminate a previously running Captua instance and record our PID.
+
+    Captua is a one-shot annotation overlay: starting a new capture means
+    the old overlay is stale, so it gets a SIGTERM (with a short grace
+    period) before the new instance takes over.
+    """
+    pid_file = _pid_file()
+    old_pid: int | None = None
+    try:
+        old_pid = int(pid_file.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        pass
+
+    if old_pid is not None and old_pid != os.getpid() and _is_captua_process(old_pid):
+        try:
+            os.kill(old_pid, signal.SIGTERM)
+            for _ in range(20):  # up to 2 s grace period
+                time.sleep(0.1)
+                try:
+                    os.kill(old_pid, 0)
+                except OSError:
+                    break
+        except OSError:
+            pass
+
+    try:
+        pid_file.write_text(str(os.getpid()), encoding="utf-8")
+        atexit.register(lambda: pid_file.unlink(missing_ok=True))
+    except OSError:
+        pass
 
 
 def main() -> int:
@@ -50,6 +103,9 @@ def main() -> int:
             print("  --screen, -s   Capture the full active screen")
             print("  --window, -w   Capture the active Hyprland window")
             return 0
+
+    # A new capture replaces any still-open overlay from a previous run
+    ensure_single_instance()
 
     try:
         if capture_mode == "region":

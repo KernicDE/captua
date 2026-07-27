@@ -22,7 +22,17 @@ class TestComputeWindowSize:
         assert w == 280
 
     def test_toolbar_width_does_not_inflate_window(self) -> None:
-        # A narrow screenshot must not get a wide window just because the
-        # toolbar prefers more space — the toolbar scrolls instead.
+        # Without a toolbar_w argument the toolbar plays no role (it scrolls).
         w, _ = compute_window_size(300, 200, toolbar_h=80, max_w=1920, max_h=1080)
         assert w == 350
+
+    def test_toolbar_width_is_enforced(self) -> None:
+        # Small screenshot: the window grows to fit the pill toolbar.
+        w, _ = compute_window_size(100, 100, toolbar_h=80, max_w=1920, max_h=1080,
+                                   toolbar_w=640)
+        assert w == 640
+
+    def test_toolbar_width_capped_at_available(self) -> None:
+        w, _ = compute_window_size(100, 100, toolbar_h=80, max_w=500, max_h=1080,
+                                   toolbar_w=640)
+        assert w == 500

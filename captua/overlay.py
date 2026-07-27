@@ -17,14 +17,15 @@ def compute_window_size(
     max_w: int,
     max_h: int,
     min_w: int = _MIN_WINDOW_WIDTH,
+    toolbar_w: int = 0,
 ) -> tuple[int, int]:
     """Fixed window size: content plus a 50px margin and the toolbar height.
 
-    Capped at the available screen space (max_w/max_h). The toolbar's own
-    preferred width is deliberately ignored — the ToolbarScrollArea scrolls
-    horizontally when the window is narrower than the toolbar.
+    Capped at the available screen space (max_w/max_h). The window is at
+    least min_w and at least toolbar_w wide so the pill toolbar fits
+    without scrolling in the common (select-tool) case.
     """
-    w = min(max(int(content_w) + _WINDOW_MARGIN, min_w), max_w)
+    w = min(max(int(content_w) + _WINDOW_MARGIN, min_w, toolbar_w), max_w)
     h = min(max(int(content_h) + _WINDOW_MARGIN + toolbar_h, 0), max_h)
     return w, h
 
@@ -474,16 +475,18 @@ class OverlayWindow(QMainWindow):
         """Resize window to the actual content (screenshot + annotations)
         plus a fixed 50px margin and the toolbar height. Deliberately ignores
         the scene's decorative backdrop padding (user-configurable, up to
-        120px) and the toolbar's preferred width (the toolbar scrolls
-        horizontally instead) so neither inflates the window itself."""
+        120px). The window is at least as wide as the pill toolbar (plus the
+        central layout margins) so it fits without scrolling."""
         _, max_w, max_h = self._screen_constraints()
         content_rect = self._scene.content_rect()
+        toolbar_w = self._toolbar.width() + 20  # 10px central layout margins
         new_w, new_h = compute_window_size(
             content_rect.width(),
             content_rect.height(),
             self._toolbar_scroll.height(),
             max_w,
             max_h,
+            toolbar_w=toolbar_w,
         )
         self.resize(new_w, new_h)
 
