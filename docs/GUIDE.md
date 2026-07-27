@@ -24,17 +24,12 @@ pacman -S python python-pyside6 grim slurp wl-clipboard
 
 ## Toolbar
 
-The top bar contains (left to right):
+The floating pill bar at the top contains:
 
-- **✕** — Close the overlay (`Esc`)
-- **💾** — Save to file (`Ctrl+S`)
-- **📋** — Copy to clipboard (`Ctrl+C`)
-- **➕** — Import an image from disk
-- **📷** — Capture a new region and add it to the canvas
-- **⚙** — Backdrop settings (padding, color, corner radius)
+- **Top row:** Close (`Esc`) on the left; Backdrop settings, Snap toggle, an overflow menu (⋯: Import image, Capture region), **Save** (`Ctrl+S`) and the primary **Copy** button (`Ctrl+C`) on the right
+- **Bottom row:** the tool buttons (see table below), a **pin toggle** to keep the active tool after drawing, and the contextual property controls
 - **Line color / width** — Stroke appearance for shapes, lines, arrows, etc.
 - **Fill color / opacity** — Fill appearance for closed shapes
-- **Tool buttons** — See table below
 
 ## Tools
 
@@ -123,7 +118,7 @@ Changes are previewed live. Settings persist between sessions.
 
 | Shortcut | Action |
 |---|---|
-| `Esc` | Close overlay (or clear text focus) |
+| `Esc` | Clear text focus → clear selection → close overlay |
 | `Ctrl+S` | Save to file |
 | `Ctrl+C` | Copy to clipboard |
 | `Ctrl+V` | Paste image from clipboard |
@@ -138,9 +133,10 @@ Changes are previewed live. Settings persist between sessions.
 
 ## Tips
 
-- After drawing most annotations, the tool automatically switches back to **Mouse** mode so you can reposition it immediately.
+- After drawing most annotations, the tool automatically switches back to **Mouse** mode so you can reposition it immediately. Toggle the **pin** button next to the tools to keep the active tool instead (persists between sessions).
 - The **Picker** (`D`) stays active after a click so you can sample multiple colours; switch to another tool when done.
-- The canvas auto-expands when you drag items beyond the current boundary; the window grows to match.
+- The window has a fixed size — the captured content plus a 50 px margin, capped at the available screen space. Content drawn beyond the image edge stays reachable via pan and zoom.
+- Copying is instant: the window closes right away while the image is encoded, saved and handed to the clipboard in the background.
 - Use **Undo** liberally — the full history is kept in memory for the session.
 - The checkerboard pattern behind the canvas is only visible in the editor; it is **not** included in saved or copied images.
 - Captua checks for updates on startup. If a newer version is available you can update with one click (when running from a git clone) or open the release page in your browser.

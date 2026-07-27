@@ -694,7 +694,7 @@ class CanvasView(QGraphicsView):
             "<td><b>Ctrl+S</b></td><td>Save as</td></tr>"
             "<tr><td><b>Del</b></td><td>Delete selection</td>"
             "<td><b>PgUp/PgDn</b></td><td>Layer order</td></tr>"
-            "<tr><td><b>Esc</b></td><td>Close</td>"
+            "<tr><td><b>Esc</b></td><td>Deselect / Close</td>"
             "<td><b>?</b></td><td>Toggle this help</td></tr>"
             "</table>"
         )
@@ -769,6 +769,12 @@ class CanvasView(QGraphicsView):
             if self._shortcut_overlay is not None:
                 self._shortcut_overlay.deleteLater()
                 self._shortcut_overlay = None
+                event.accept()
+                return
+            # Deselect before closing so an accidental Esc never discards
+            # the annotations along with the window
+            if self.scene().selectedItems():
+                self.scene().clearSelection()
                 event.accept()
                 return
             self.window().close()

@@ -3,14 +3,39 @@
 # Pixels of checkerboard visible around the scene/backdrop when the window opens.
 _VIEWPORT_MARGIN = 50
 
+# Pixels of window chrome around the content (screenshot + annotations).
+_WINDOW_MARGIN = 50
+
+# Hard lower bound for the window width.
+_MIN_WINDOW_WIDTH = 280
+
+
+def compute_window_size(
+    content_w: float,
+    content_h: float,
+    toolbar_h: int,
+    max_w: int,
+    max_h: int,
+    min_w: int = _MIN_WINDOW_WIDTH,
+) -> tuple[int, int]:
+    """Fixed window size: content plus a 50px margin and the toolbar height.
+
+    Capped at the available screen space (max_w/max_h). The toolbar's own
+    preferred width is deliberately ignored — the ToolbarScrollArea scrolls
+    horizontally when the window is narrower than the toolbar.
+    """
+    w = min(max(int(content_w) + _WINDOW_MARGIN, min_w), max_w)
+    h = min(max(int(content_h) + _WINDOW_MARGIN + toolbar_h, 0), max_h)
+    return w, h
+
 import shutil
 import subprocess
 import threading
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QBuffer, QIODevice, QPointF, QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtCore import QBuffer, QIODevice, QPointF, QRectF, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QImage, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -27,6 +52,7 @@ from PySide6.QtWidgets import (
 from .backdrop import BackdropPopup
 from .canvas import CanvasScene, CanvasView, draw_backdrop
 from .settings import apply_to_scene, extract_from_scene, load_settings, save_settings
+from .theme import TOAST_STYLE, WINDOW_BG
 from .toolbar import Toolbar
 from .tools import (
     ArrowTool,
@@ -51,26 +77,53 @@ from .tools import (
 )
 
 
-def _copy_via_wl_copy(pixmap: QPixmap) -> None:
-    """Push image to the Wayland clipboard via wl-copy in a background thread."""
+def _deliver_png(
+    image: "QImage",
+    save_path: Path | None,
+    use_wl_copy: bool,
+) -> tuple[bool, str]:
+    """Background worker: encode PNG once, auto-save it, hand it to wl-copy.
+
+    Runs off the UI thread. Encoding a QImage (not QPixmap) and writing the
+    file here keeps the UI responsive. Returns (success, saved_filename);
+    success is False only when the auto-save write failed — wl-copy delivery
+    is best-effort.
+    """
     try:
         buffer = QBuffer()
         buffer.open(QIODevice.OpenModeFlag.WriteOnly)
-        pixmap.save(buffer, "PNG")
+        image.save(buffer, "PNG")
         png_data = bytes(buffer.data())
         buffer.close()
-
-        proc = subprocess.Popen(
-            ["wl-copy", "--type", "image/png"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        proc.stdin.write(png_data)
-        proc.stdin.close()
-        proc.wait(timeout=5)
     except Exception:
-        pass
+        return False, ""
+
+    saved_name = ""
+    if save_path is not None:
+        try:
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            save_path.write_bytes(png_data)
+            saved_name = save_path.name
+        except OSError:
+            return False, ""
+
+    if use_wl_copy:
+        try:
+            proc = subprocess.Popen(
+                ["wl-copy", "--type", "image/png"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            proc.stdin.write(png_data)
+            proc.stdin.close()
+            # Wait until wl-copy has taken over the data so the clipboard
+            # survives the app exiting right after.
+            proc.wait(timeout=5)
+        except Exception:
+            pass
+
+    return True, saved_name
 
 
 class ToolbarScrollArea(QScrollArea):
@@ -84,6 +137,7 @@ class ToolbarScrollArea(QScrollArea):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setStyleSheet("background: transparent;")
         self.setMinimumWidth(0)
 
     def wheelEvent(self, event) -> None:
@@ -103,6 +157,8 @@ class OverlayWindow(QMainWindow):
         windowrule = pin on, match:class ^(captua-overlay)$
     """
 
+    copy_finished = Signal(bool, str)
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
@@ -116,20 +172,19 @@ class OverlayWindow(QMainWindow):
         )
 
         # Background colour (dark, modern)
-        self.setStyleSheet("background-color: #0A0A0A;")
+        self.setStyleSheet(f"background-color: {WINDOW_BG};")
         self.setAcceptDrops(True)
 
-        # Central widget with vertical layout
+        # Central widget with vertical layout; margins let the pill toolbar
+        # and the canvas float above the window background.
         central = QWidget(self)
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
 
-        # Toolbar wrapped in a scroll area so it doesn't force the window width.
-        # Keep the window's hard minimum small; showEvent() grows the window
-        # towards the toolbar's preferred width but never past the available
-        # screen space, letting the toolbar scroll horizontally if needed.
+        # Toolbar wrapped in a scroll area so it never forces the window
+        # width — it scrolls horizontally when the window is narrower.
         self._toolbar = Toolbar(self)
         self._toolbar_scroll = ToolbarScrollArea(self._toolbar, self)
         layout.addWidget(self._toolbar_scroll)
@@ -139,9 +194,7 @@ class OverlayWindow(QMainWindow):
         # Toast label for ephemeral status messages
         self._toast = QLabel(self)
         self._toast.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._toast.setStyleSheet(
-            "background-color: #1A1A1A; color: #E8E8E8; border-radius: 6px; padding: 6px 12px; font-size: 12px;"
-        )
+        self._toast.setStyleSheet(TOAST_STYLE)
         self._toast.hide()
 
         # Canvas fills the rest of the window
@@ -178,6 +231,11 @@ class OverlayWindow(QMainWindow):
         self._settings = load_settings()
         apply_to_scene(self._scene, self._settings)
 
+        # Sticky tools: keep the active tool after drawing instead of
+        # auto-switching back to select
+        self._sticky_tools = bool(self._settings.get("sticky_tools", False))
+        self._toolbar.set_sticky(self._sticky_tools)
+
         # Apply default tool properties from settings
         self._props.color = QColor(self._settings.get("line_color", "#FF5D62"))
         self._props.stroke_width = self._settings.get("line_width", 3)
@@ -205,12 +263,15 @@ class OverlayWindow(QMainWindow):
         self._toolbar.backdrop_settings_triggered.connect(self._show_backdrop_dialog)
         self._toolbar.magnifier_zoom_changed.connect(self._update_magnifier_zoom)
         self._toolbar.snap_toggled.connect(self._update_snap)
+        self._toolbar.sticky_toggled.connect(self._update_sticky)
 
-        self._view.tool_finished.connect(lambda: self._set_tool("select"))
+        self._view.tool_finished.connect(self._on_tool_finished)
         self._view.tool_selected.connect(self._set_tool)
         self._scene.selectionChanged.connect(self._on_selection_changed)
         self._scene.sceneRectChanged.connect(self._on_scene_rect_changed)
         self._scene.scene_rect_fitted.connect(self._on_scene_rect_fitted)
+        self._copy_in_progress = False
+        self.copy_finished.connect(self._on_copy_finished)
 
     def _set_tool(self, name: str) -> None:
         tool = self._tools.get(name)
@@ -294,6 +355,14 @@ class OverlayWindow(QMainWindow):
 
     def _update_snap(self, enabled: bool) -> None:
         self._scene.snap_enabled = enabled
+
+    def _update_sticky(self, enabled: bool) -> None:
+        self._sticky_tools = enabled
+
+    def _on_tool_finished(self) -> None:
+        """Auto-switch back to select after a draw — unless sticky tools are on."""
+        if not self._sticky_tools:
+            self._set_tool("select")
 
     def _capture_region(self) -> None:
         """Capture a new region and add it to the canvas."""
@@ -400,13 +469,17 @@ class OverlayWindow(QMainWindow):
         """Resize window to the actual content (screenshot + annotations)
         plus a fixed 50px margin and the toolbar height. Deliberately ignores
         the scene's decorative backdrop padding (user-configurable, up to
-        120px) so backdrop settings never inflate the window itself."""
+        120px) and the toolbar's preferred width (the toolbar scrolls
+        horizontally instead) so neither inflates the window itself."""
         _, max_w, max_h = self._screen_constraints()
         content_rect = self._scene.content_rect()
-        needed_w = int(content_rect.width()) + 50
-        needed_h = int(content_rect.height()) + 50 + 80
-        new_w = min(max(needed_w, self.minimumWidth()), max_w)
-        new_h = min(max(needed_h, 0), max_h)
+        new_w, new_h = compute_window_size(
+            content_rect.width(),
+            content_rect.height(),
+            self._toolbar_scroll.height(),
+            max_w,
+            max_h,
+        )
         self.resize(new_w, new_h)
 
     def _on_scene_rect_changed(self, rect: QRectF) -> None:
@@ -414,16 +487,10 @@ class OverlayWindow(QMainWindow):
         pass
 
     def _on_scene_rect_fitted(self, old_rect: QRectF, new_rect: QRectF) -> None:
-        """Resize window to keep growing content (e.g. an annotation drawn
-        past the image edge) visible — plus a fixed 50px margin and the
-        toolbar height, ignoring the decorative backdrop padding."""
-        _, max_w, max_h = self._screen_constraints()
-        content_rect = self._scene.content_rect()
-        needed_w = int(content_rect.width()) + 50
-        needed_h = int(content_rect.height()) + 50 + 80
-        new_w = min(max(needed_w, self.minimumWidth()), max_w)
-        new_h = min(max(needed_h, 0), max_h)
-        self.resize(new_w, new_h)
+        """Scene grew past the image edge (e.g. an annotation drawn outside).
+
+        The window size stays fixed — overflowing content remains reachable
+        via pan/zoom. Only a repaint is needed."""
         self._view.viewport().update()
 
     def set_image(self, pixmap: QPixmap) -> None:
@@ -465,15 +532,18 @@ class OverlayWindow(QMainWindow):
             self._view.centerOn(content_rect.center())
 
     def showEvent(self, event) -> None:
-        """Defer fitting until the viewport has a real size."""
+        """Recompute sizing once the window actually has a platform window.
+
+        Before the first show(), self.screen() can report the screen under
+        the OS cursor instead of the one set via setScreen() (no platform
+        window exists yet for Qt to bind to), which corrupts the available-
+        space calculation in _resize_for_scene(). Recomputing here, after
+        super().showEvent() has created the real platform window, uses the
+        correct screen.
+        """
         super().showEvent(event)
-        # Ensure the window is wide enough for the toolbar content, but never
-        # wider than the available screen space.
-        _, max_w, _ = self._screen_constraints()
-        toolbar_w = min(self._toolbar.minimumSizeHint().width(), max_w)
-        if self.width() < toolbar_w:
-            self.resize(toolbar_w, self.height())
         if self._scene.base_image() is not None:
+            self._resize_for_scene()
             self._fit_image()
         # Grab keyboard focus immediately so modifier keys (e.g. Ctrl for
         # zoom) are recognised without requiring a click into the canvas first.
@@ -481,12 +551,17 @@ class OverlayWindow(QMainWindow):
         self._view.setFocus(Qt.FocusReason.ActiveWindowFocusReason)
 
     def closeEvent(self, event) -> None:
-        """Persist all current settings on window close."""
-        stored = {**extract_from_scene(self._scene)}
+        """Persist all current settings on window close.
+
+        Merges over the loaded settings so keys managed elsewhere
+        (screenshots folder/template, update check, skipped version,
+        auto-save toggle) are not wiped on every close."""
+        stored = {**self._settings, **extract_from_scene(self._scene)}
         stored["line_color"] = self._props.color.name()
         stored["line_width"] = self._props.stroke_width
         stored["fill_color"] = self._props.fill_color.name()
         stored["fill_alpha"] = self._props.fill_alpha
+        stored["sticky_tools"] = self._sticky_tools
         save_settings(stored)
         super().closeEvent(event)
 
@@ -546,19 +621,13 @@ class OverlayWindow(QMainWindow):
                 painter.end()
         return pixmap
 
-    def _save_pixmap_auto(self, pixmap: QPixmap) -> Path | None:
-        """Save pixmap to the configured screenshots folder. Returns the path or None on failure."""
+    def _auto_save_path(self) -> Path:
+        """Compute the auto-save target path from the configured folder/template."""
         folder = Path(self._settings.get("screenshots_folder", "~/Pictures/Screenshots")).expanduser()
-        folder.mkdir(parents=True, exist_ok=True)
-
         ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         template = self._settings.get("screenshot_filename_template", "captua-{timestamp}.png")
         filename = template.replace("{timestamp}", ts).replace("{date}", datetime.now().strftime("%Y-%m-%d"))
-        path = folder / filename
-
-        if pixmap.save(str(path), "PNG"):
-            return path
-        return None
+        return folder / filename
 
     def _show_toast(self, message: str, duration_ms: int = 1500) -> None:
         """Show a transient status label centered in the window."""
@@ -566,9 +635,7 @@ class OverlayWindow(QMainWindow):
         if self._toast is None:
             self._toast = QLabel(self)
             self._toast.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._toast.setStyleSheet(
-                "background-color: #1A1A1A; color: #E8E8E8; border-radius: 6px; padding: 6px 12px; font-size: 12px;"
-            )
+            self._toast.setStyleSheet(TOAST_STYLE)
         self._toast.setText(message)
         self._toast.adjustSize()
         x = (self.width() - self._toast.width()) // 2
@@ -579,37 +646,50 @@ class OverlayWindow(QMainWindow):
         QTimer.singleShot(duration_ms, self._toast.hide)
 
     def copy_to_clipboard(self) -> None:
-        """Render scene, copy to clipboard, auto-save, and optionally close."""
+        """Render scene, copy to clipboard, auto-save in the background, close.
+
+        Only the render and the QClipboard handoff run on the UI thread;
+        PNG encoding, disk write and wl-copy delivery happen in a background
+        thread that reports back via copy_finished. The window closes as soon
+        as the delivery is done — no artificial delay."""
+        if self._copy_in_progress:
+            return
+        self._copy_in_progress = True
+        self._toolbar.set_copy_enabled(False)
+
         pixmap = self.render_to_pixmap()
+        image = pixmap.toImage()
         clipboard = QApplication.clipboard()
         if clipboard is not None:
             # Use setImage instead of setPixmap — it is more reliable on Wayland
-            clipboard.setImage(pixmap.toImage())
-
-        # Wayland: keep image in clipboard after app exits by spawning wl-copy
-        # asynchronously so it never blocks the UI thread.
-        if shutil.which("wl-copy"):
-            threading.Thread(
-                target=_copy_via_wl_copy,
-                args=(pixmap,),
-                daemon=True,
-            ).start()
+            clipboard.setImage(image)
 
         auto_save = self._settings.get("auto_save_on_copy", True)
-        if auto_save:
-            saved_path = self._save_pixmap_auto(pixmap)
-            if saved_path is not None:
-                self._show_toast(f"Saved to {saved_path.name}", 1200)
-                # Delay close so the toast is visible briefly
-                QTimer.singleShot(1400, self.close)
-            else:
-                QMessageBox.critical(
-                    self,
-                    "Save Failed",
-                    "Could not auto-save the screenshot. Please use Save As (Ctrl+S) instead.",
-                )
-        else:
-            self.close()
+        save_path = self._auto_save_path() if auto_save else None
+        use_wl_copy = shutil.which("wl-copy") is not None
+        threading.Thread(
+            target=self._deliver_copy,
+            args=(image, save_path, use_wl_copy),
+            daemon=True,
+        ).start()
+
+    def _deliver_copy(self, image: QImage, save_path: Path | None, use_wl_copy: bool) -> None:
+        ok, saved_name = _deliver_png(image, save_path, use_wl_copy)
+        self.copy_finished.emit(ok, saved_name)
+
+    def _on_copy_finished(self, ok: bool, saved_name: str) -> None:
+        self._copy_in_progress = False
+        self._toolbar.set_copy_enabled(True)
+        if not ok:
+            QMessageBox.critical(
+                self,
+                "Save Failed",
+                "Could not auto-save the screenshot. Please use Save As (Ctrl+S) instead.",
+            )
+            return
+        # Closing right away is the feedback that the copy succeeded; wl-copy
+        # has already taken over the clipboard data at this point.
+        self.close()
 
     def save_to_disk(self) -> None:
         """Render scene and save to a user-selected file."""
@@ -618,7 +698,7 @@ class OverlayWindow(QMainWindow):
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Save Screenshot",
-            "captua-screenshot.png",
+            self._auto_save_path().name,
             "Images (*.png *.jpg *.webp)",
         )
         if file_path:

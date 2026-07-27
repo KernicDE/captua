@@ -3,10 +3,12 @@
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QPixmap
 
+from .theme import ACCENT, TEXT_DIM
+
 _ICON_SIZE = 20
 _STROKE = 1.5
-_COLOR = QColor("#A0A0A0")
-_COLOR_ACTIVE = QColor("#E8E8E8")
+_COLOR = QColor(TEXT_DIM)
+_COLOR_ACTIVE = QColor(ACCENT)
 
 
 def _create_pixmap() -> QPixmap:
@@ -156,6 +158,11 @@ def icon(name: str, active: bool = False) -> QPixmap:
     elif name == "close":
         p.drawLine(QPointF(5, 5), QPointF(15, 15))
         p.drawLine(QPointF(15, 5), QPointF(5, 15))
+
+    elif name == "pin":
+        # Pushpin: round head with a stem
+        p.drawEllipse(QRectF(6, 2, 8, 8))
+        p.drawLine(QPointF(10, 10), QPointF(10, 18))
 
     elif name == "save":
         p.drawRect(QRectF(4, 3, 12, 14))

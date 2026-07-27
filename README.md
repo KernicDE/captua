@@ -86,9 +86,23 @@ Add these window rules to `~/.config/hypr/hyprland.conf`:
 ```ini
 windowrulev2 = float, class:(captua-overlay)
 windowrulev2 = center, class:(captua-overlay)
-windowrulev2 = size 80%, class:(captua-overlay)
 windowrulev2 = noanim, class:(captua-overlay)
 ```
+
+Note: do not force a size (e.g. `size 80%`) — Captua sizes its window itself to the captured content plus a fixed margin.
+
+### Niri
+
+Add a window rule to `~/.config/niri/config.kdl`:
+
+```kdl
+window-rule {
+    match app-id="captua-overlay";
+    open-floating true;
+}
+```
+
+Floating is a compositor decision — Captua requests a frameless window sized to the screenshot (content + 50px margin, capped at the available screen space), and the rule above keeps it floating instead of tiled.
 
 ### KDE Plasma (KWin)
 

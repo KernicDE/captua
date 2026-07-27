@@ -1,70 +1,151 @@
 # Captua Agent Guide
 
+## Project Overview
+
+Captua is a fast, lightweight screenshot annotation tool (a Shottr clone) for **Linux / Wayland only**, written in Python with PySide6 (Qt6). It captures a region, screen, or window, opens it in a frameless overlay window with a `QGraphicsScene` canvas, and lets the user annotate, then copy or save the result.
+
+- Current version: **0.4.1** (kept in sync in `captua/__init__.py` and `pyproject.toml`)
+- Entry point: console script `captua = captua.main:main`
+- CLI modes: `captua` (region, default), `captua --screen|-s`, `captua --window|-w`, `captua --help|-h`
+- Repository: https://github.com/KernicDE/captua
+
+## Tech Stack
+
+- Python 3.11+, PySide6 >= 6.5, Pillow >= 10.0
+- Build backend: hatchling (`pyproject.toml`)
+- System dependencies (Wayland tools, installed via distro package manager):
+  - `grim` — screenshot capture
+  - `slurp` — region selection
+  - `wl-clipboard` (`wl-copy`) — clipboard integration
+  - `hyprctl` (Hyprland) or `niri` (Niri) — window capture
+- Dev dependencies (extra `dev`): `pytest`, `pytest-qt`
+
 ## Project Structure
 
 ```
 captua/
-  __init__.py       # Package meta
-  main.py           # Entry point: QApplication setup, capture mode dispatch
-  capture.py        # grim/slurp/hyprctl integration (screenshot capture)
-  overlay.py        # Frameless QMainWindow overlay; render/export; settings wiring; auto-save on copy
-  canvas.py         # QGraphicsScene + QGraphicsView with zoom/pan, backdrop draw helper, shortcut overlay
-  toolbar.py        # Top toolbar: action buttons, tool buttons with icons, contextual property controls
-  icons.py          # Programmatically-drawn monochrome toolbar icons
-  updater.py        # Async GitHub release checker (QNetworkAccessManager)
-  update_dialog.py  # Non-blocking update-available dialog with self-update progress
-  self_updater.py   # git pull + pip install -e . + os.execl restart
-  tools.py          # Annotation tool implementations (pen, arrow, text, etc.)
-  items.py          # QGraphicsItem subclasses for annotations and images
-  backdrop.py       # Backdrop settings dialog with live preview
-  settings.py       # JSON-based persistent settings (~/.config/captua/settings.json)
-  history.py        # Undo/redo command stack
-  colorwheel.py     # Color picker dialog
-  popups.py         # Emoji and shape selector popups
-  shapes.py         # Pre-defined shape paths
-  emojipicker.py    # Emoji data/model for popup
-docs/
-  GUIDE.md          # User-facing feature documentation
-pyproject.toml      # Project config
+  __init__.py       # Package meta (__version__)
+  main.py           # Entry point: QApplication setup, CLI arg parsing, capture mode dispatch,
+                    # screen selection, async update check (3 s delayed)
+  capture.py        # Screenshot capture via grim/slurp/hyprctl/niri (subprocess)
+  overlay.py        # Frameless OverlayWindow (QMainWindow): toolbar + canvas wiring,
+                    # fixed window sizing (compute_window_size), render/export,
+                    # clipboard (also shells out to wl-copy), background auto-save on copy
+  canvas.py         # CanvasScene (QGraphicsScene) + CanvasView (QGraphicsView): zoom/pan,
+                    # resize handles, tool routing, shortcuts, magnetic snap (snap_rect/snap_point),
+                    # backdrop draw helper, `?` shortcut overlay
+  toolbar.py        # Floating pill toolbar: close/save/copy actions, overflow menu,
+                    # tool buttons with icons, sticky-tools pin, contextual property controls
+  theme.py          # Central palette + stylesheet builders (single accent, pill styles)
+  icons.py          # Programmatically-drawn monochrome 20×20 toolbar icons via QPainter
+  tools.py          # Annotation tool classes (SelectTool, CropTool, RectangleTool, EllipseTool,
+                    # LineTool, ArrowTool, PenTool, MarkerTool, TextTool, CounterTool, ShapeTool,
+                    # EmojiTool, LabelTool, RulerTool, SpotlightTool, BlurTool, MagnifierTool,
+                    # EyedropperTool) + ToolProperties
+  items.py          # QGraphicsItem subclasses for all annotations, CanvasImageItem,
+                    # CropOverlayItem, EyedropperItem
+  history.py        # Undo/redo command stack (Command, AddItemCommand, RemoveItemCommand, History)
+  settings.py       # JSON persistence to ~/.config/captua/settings.json (atomic write via tmp file)
+  backdrop.py       # BackdropPopup (live-preview backdrop settings) + _AngleDial widget
+  colorwheel.py     # Color picker dialog (ColorWheelDialog)
+  popups.py         # ShapePopup, EmojiPopup, MagnifierPopup selector popups
+  shapes.py         # Pre-defined shape paths + ShapePickerDialog
+  emojipicker.py    # Emoji data/model + EmojiPickerDialog
+  updater.py        # Async GitHub release checker (UpdateChecker, QNetworkAccessManager)
+  update_dialog.py  # Non-blocking update-available dialog; triggers SelfUpdater
+  self_updater.py   # pip install --upgrade from GitHub release tarball via QProcess, then os.execl restart
+tests/              # pytest suite (see Testing)
+scripts/
+  install.sh        # End-user installer (distro detection, venv at ~/.local/share/captua, .desktop entry)
+  debug.sh          # Dev wrapper: runs `python3 -m captua.main` with repo on PYTHONPATH, logs to /tmp/captua.log
+docs/GUIDE.md       # User-facing feature documentation
+docs/superpowers/   # Plans/notes for AI-assisted development
+.github/workflows/release.yml  # Tag-triggered release packaging
+pyproject.toml      # Project config, dependencies, pytest config
+run.sh              # NOTE: currently a hardcoded launcher for one user's installed venv
+                    # (~/.local/share/captua/venv/bin/captua); it does NOT run from the repo.
+                    # For development use scripts/debug.sh or `python3 -m captua.main`.
 ```
 
-## Tech Stack
-- Python 3.11+
-- PySide6 (Qt6)
-- grim, slurp (system deps for screenshot capture on Wayland)
-
 ## Architecture
-- `main.py` boots the app, decides capture mode, creates `OverlayWindow`
-- `OverlayWindow` owns a `CanvasView` which owns a `CanvasScene`
-- `CanvasScene` holds layers: base image (z=0), additional images (z=0), annotations (z>0)
-- `CanvasView.drawBackground()` paints checkerboard + backdrop (not scene items)
-- `CanvasView.drawForeground()` paints resize handles for selected rect items
-- `capture.py` is the only module that shells out to system commands
-- `settings.py` persists backdrop preferences, default tool properties, auto-save, and update-check settings to `~/.config/captua/settings.json`
-- `icons.py` renders all toolbar icons as crisp 20×20 QPixmaps using QPainter
-- `updater.py` checks GitHub releases API asynchronously on startup (3-second delay)
-- `update_dialog.py` shows a non-modal, stay-on-top dialog with changelog and Update Now / Ask Again / Skip buttons
-- `self_updater.py` performs the actual update when running from a git clone: `git pull origin main`, `pip install -e .`, then `os.execl` restart
+
+- `main.py` boots the `QApplication` (app name/desktop file: `captua-overlay`), picks the capture mode from CLI args, captures via `capture.py`, creates the `OverlayWindow`, and starts a delayed (3 s) non-blocking update check.
+- `OverlayWindow` (overlay.py) owns a `CanvasView` (canvas.py), which owns a `CanvasScene`.
+- `CanvasScene` holds layers: base image (z=0), additional images (z=0), annotations (z>0).
+- `CanvasView.drawBackground()` paints the checkerboard + backdrop (not scene items); `drawForeground()` paints resize handles for selected rect items.
+- Subprocess usage: `capture.py` shells out to grim/slurp/hyprctl/niri; `overlay.py` shells out to `wl-copy` for clipboard; `self_updater.py` runs `pip` via `QProcess`.
+- `settings.py` persists backdrop preferences, default tool properties, snap toggle, sticky-tools toggle, auto-save, screenshots folder/filename template, and update-check settings to `~/.config/captua/settings.json` (defaults merged on load, atomic save). `OverlayWindow.closeEvent()` merges current values over the loaded settings so unrelated keys survive.
+- Tools in `tools.py` each receive `(scene, props, history)` and implement mouse press/move/release; completed edits are pushed onto the `History` command stack for undo/redo.
 
 ## Key Behaviours
-- **Backdrop in exports**: `OverlayWindow.render_to_pixmap()` computes `itemsBoundingRect()`, draws the backdrop via `draw_backdrop()`, then renders scene items on top.
-- **Window auto-resize**: `CanvasScene` emits `scene_rect_fitted` when items expand the scene; `OverlayWindow._on_scene_rect_fitted()` grows (never shrinks) the window to fit content, capped at 90% of screen. (`sceneRectChanged` is connected but its handler is a no-op.)
-- **Auto-switch to select**: `CanvasView` emits `tool_finished` after non-select tools complete; `OverlayWindow` switches back to select mode.
-- **Checkerboard not exported**: The checkerboard is drawn in `drawBackground()` but is intentionally skipped in `render_to_pixmap()`.
-- **Auto-save on copy**: When `auto_save_on_copy` is true (default), pressing `Ctrl+C` or clicking Copy copies to clipboard via `QClipboard`, saves to `~/Pictures/Screenshots/captua-<timestamp>.png`, shows a brief toast, and closes the app.
-- **Contextual properties**: The toolbar properties panel (colour, width, fill alpha) is only visible when a drawing tool is active or a single item is selected.
-- **Keyboard shortcut overlay**: Press `?` to show a help overlay listing all shortcuts. Press `Esc` or `?` again to dismiss.
-- **Auto-updater**: After a 3-second delay on startup, the app checks GitHub releases. If a newer version exists and hasn't been skipped, a non-modal dialog appears showing the changelog with three options:
-  - **Update Now** — opens the release page in the default browser
-  - **Ask Again Later** — dismisses the dialog; will ask again on next startup
-  - **Skip This Version** — persists the skipped version to settings; won't ask again until a newer release
-- **Self-update**: If Captua is running from a git clone, "Update Now" performs `git pull` + `pip install -e .` and restarts automatically. Otherwise it falls back to opening the release page in a browser.
-- **Magnetic snap**: Enabled via toolbar toggle. `snap_rect()` in `canvas.py` aligns edges/centerlines of the moving item to all other items (including the base image) with 15 px tolerance. Drawing tools call `snap_point()` for corner/edge alignment unless Shift is held.
+
+- **Backdrop in exports**: `OverlayWindow.render_to_pixmap()` computes `itemsBoundingRect()`, draws the backdrop, then renders scene items on top. The checkerboard is drawn in `drawBackground()` but intentionally skipped in exports.
+- **Fixed window size**: `compute_window_size()` (overlay.py) sizes the window once to content + 50px margin + toolbar height, capped at the available screen space (`availableGeometry()` minus 40px). The toolbar's preferred width is ignored — the `ToolbarScrollArea` scrolls horizontally instead. `scene_rect_fitted` no longer resizes the window; overflowing content stays reachable via pan/zoom.
+- **Auto-switch to select**: `CanvasView` emits `tool_finished` after non-select tools complete; `OverlayWindow` switches back to select mode unless **sticky tools** are enabled (pin toggle in the toolbar, persisted as `sticky_tools`).
+- **Auto-save on copy**: when `auto_save_on_copy` is true (default), `Ctrl+C` / Copy renders once, sets the `QClipboard` image synchronously, then encodes PNG once in a background thread that also writes `<screenshots_folder>/<template>.png` (default `~/Pictures/Screenshots/captua-{timestamp}.png`) and feeds `wl-copy`. The thread reports back via the `copy_finished` signal; the window closes immediately on success (no artificial delay) or stays open with an error dialog on save failure.
+- **Esc hierarchy**: `Esc` clears text focus → closes the shortcut overlay → clears the selection → and only then closes the window.
+- **Contextual properties**: the toolbar properties panel (colour, width, fill alpha) is only visible when a drawing tool is active or a single item is selected.
+- **Keyboard shortcut overlay**: `?` toggles a help overlay listing all shortcuts; `Esc` or `?` dismisses it.
+- **Auto-updater**: 3 s after startup the app queries the GitHub releases API. If a newer, non-skipped version exists, a non-modal dialog offers **Update Now** (self-update, see below), **Ask Again Later**, or **Skip This Version** (persisted as `skipped_version`).
+- **Self-update**: `SelfUpdater` runs `pip install --upgrade <github release tarball URL>` via `QProcess` (with a `--user` fallback on permission errors), then restarts with `os.execl` after chdir-ing to a temp dir so a git clone's source folder cannot shadow the installed package. (It no longer uses `git pull`.)
+- **Magnetic snap**: toolbar toggle (`snap_enabled` setting). `snap_rect()` aligns edges/centerlines of a moving item to all other items (15 px tolerance); drawing tools call `snap_point()` unless Shift is held.
 - **Shift constraints while drawing**: Rectangle→square, Ellipse→circle, Line/Arrow→45° snap, Pen→Bezier smoothing, Marker→straight line, Spotlight/Blur→square.
-- **Eyedropper**: `D` shortcut. A viewport QLabel overlay (not a scene item) shows live HEX+RGB under the cursor. Click copies HEX to clipboard. The tool stays active until another tool is chosen.
-- **Spotlight resize**: `SpotlightItem` exposes `rect()`/`setRect()` so `CanvasView` resize handles work on the inner transparent rectangle. `mousePressEvent` selects the item on any click; drag inside the spotlight moves the inner rect.
+- **Eyedropper**: `D` shortcut. A viewport QLabel overlay (not a scene item) shows live HEX+RGB under the cursor; click copies HEX to the clipboard. Stays active until another tool is chosen.
+- **Spotlight resize**: `SpotlightItem` exposes `rect()`/`setRect()` so the `CanvasView` resize handles work on the inner transparent rectangle.
+- **Window capture**: works on Hyprland (`hyprctl activewindow -j` + `grim -g`) and Niri (`niri msg action screenshot-window`, then loads the newest file from `~/Pictures/Screenshots`); Niri is detected via `XDG_CURRENT_DESKTOP=niri`.
+
+## Build and Run
+
+```bash
+# Development install
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Run from the repo (no install needed)
+python3 -m captua.main [--screen | -s | --window | -w]
+
+# Debug run with logging to /tmp/captua.log (sets QT_QPA_PLATFORM=wayland)
+./scripts/debug.sh [--screen | --window]
+```
+
+The repo contains two venv directories: `.venv/` was created on macOS (Homebrew Python 3.12, broken on this machine) and `venv/` targets `/usr/bin/python3.14`. Prefer creating your own `.venv` per the README. `run.sh` is a user-specific launcher, not a dev entry point (see Project Structure note).
+
+## Testing
+
+- Framework: pytest + pytest-qt (`pyproject.toml`: `testpaths = ["tests"]`, `qt_api = "pyside6"`).
+- `tests/conftest.py` provides a session-scoped `QApplication` fixture (`qapp`); widget-related tests should use it (pytest-qt's `qapp`/`qtbot` also work).
+- Capture tests mock `subprocess.run`; settings tests monkeypatch `captua.settings.CONFIG_DIR`/`CONFIG_FILE` to a `tmp_path` — never touch the real `~/.config/captua` in tests.
+
+```bash
+# Headless environments need the offscreen platform
+QT_QPA_PLATFORM=offscreen pytest            # all tests
+QT_QPA_PLATFORM=offscreen pytest tests/test_history.py -v
+```
+
+Known caveat: the two `TestCaptureWindow` tests in `tests/test_capture.py` assume the Hyprland code path and fail on a Niri session (`XDG_CURRENT_DESKTOP=niri` routes `capture_window()` to the Niri path). This is a pre-existing, environment-dependent failure — as of writing, the suite is 25 passed / 2 failed on a Niri desktop, 27 passed elsewhere.
+
+No linter config. Type-check with `mypy captua/`.
 
 ## Coding Style
-- Type hints throughout
-- Explicit imports, no wildcard imports
-- Qt enums referenced fully (e.g., `Qt.AspectRatioMode.KeepAspectRatio`)
+
+- Type hints throughout.
+- Explicit imports, no wildcard imports.
+- Qt enums referenced fully (e.g., `Qt.AspectRatioMode.KeepAspectRatio`).
+- Comments and documentation are in English.
+- Make minimal, scoped changes; match the surrounding file's naming and structure.
+
+## Release / Deployment
+
+- Releases are cut by pushing a `v*` tag. `.github/workflows/release.yml` packages a source tarball (`git archive`) plus `scripts/install.sh` and uploads them to a GitHub release with auto-generated notes.
+- End users install via `scripts/install.sh` (detects distro, installs grim/slurp/wl-clipboard, creates a venv at `~/.local/share/captua`, drops a launcher in `~/.local/bin` and a `.desktop` entry).
+- The in-app self-updater downloads the release source tarball, so every release must remain pip-installable from the tag tarball (`pip install https://github.com/KernicDE/captua/archive/refs/tags/v<X>.tar.gz`).
+- When bumping the version, update both `pyproject.toml` (`project.version`) and `captua/__init__.py` (`__version__`); the updater compares against `__version__`.
+
+## Security Considerations
+
+- The app executes external binaries (`grim`, `slurp`, `hyprctl`, `niri`, `wl-copy`, `pip`). Commands are built as argument lists (no shell string interpolation); keep it that way — never pass user input through a shell.
+- Subprocess calls use timeouts; raise `RuntimeError` (not raw `CalledProcessError`/`JSONDecodeError`) on failure so `main.py` can report cleanly.
+- Window capture on Hyprland uses a temporary PNG file that is deleted in a `finally` block; blur/magnifier pipelines process images in memory (`QBuffer`/`BytesIO`) rather than via temp files.
+- `settings.py` writes atomically (tmp file + `replace`) and merges loaded data over defaults so corrupt JSON falls back to defaults instead of crashing.
+- The self-updater pipes `pip` output to the dialog and restarts via `os.execl`; it only installs from the project's own GitHub release tarballs.
+- Screenshots may contain sensitive content; auto-save writes to the user's configured screenshots folder, and nothing is sent over the network except the GitHub release check (opt-out via `update_check_enabled`).

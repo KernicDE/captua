@@ -26,6 +26,7 @@ def _default_settings() -> dict:
         "fill_color": "#FF5D62",
         "fill_alpha": 128,
         "auto_save_on_copy": True,
+        "sticky_tools": False,
         "update_check_enabled": True,
         "skipped_version": "",
         "screenshots_folder": "~/Pictures/Screenshots",
