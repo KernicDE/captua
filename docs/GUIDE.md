@@ -10,8 +10,8 @@ Requires **Python 3.11+**, **PySide6**, **grim**, **slurp**, and **wl-clipboard*
 # Dependencies (Arch example)
 pacman -S python python-pyside6 grim slurp wl-clipboard
 
-# Run
-./run.sh
+# Run from the repo
+python3 -m captua.main [--screen | --window]
 ```
 
 ## Capture Modes
@@ -20,7 +20,7 @@ pacman -S python python-pyside6 grim slurp wl-clipboard
 |---|---|---|
 | Region | `captua` (default) | Select a rectangle with slurp |
 | Screen | `captua --screen` / `-s` | Capture the full active screen |
-| Window | `captua --window` / `-w` | Capture the active Hyprland window |
+| Window | `captua --window` / `-w` | Capture the active window (Hyprland / Niri) |
 
 ## Toolbar
 
@@ -55,7 +55,7 @@ Four floating pills in the window corners:
 
 ### Selection Editing
 
-When a single item is selected, the toolbar shows that item's properties. Changing a property updates the selected item in real time.
+When a single item is selected, the bottom-right pill shows that item's properties. Changing a property updates the selected item in real time.
 
 - **Line color** — Stroke / border color
 - **Line width** — Stroke thickness (1–20 px)
@@ -96,7 +96,7 @@ Select an item and press:
 
 Three ways to add images to the canvas:
 
-1. **Toolbar ➕** — Open a file dialog
+1. **Import button** (top-right pill) — Open a file dialog
 2. **Drag & drop** — Drop an image file onto the canvas
 3. **Ctrl+V** — Paste from clipboard
 
@@ -104,7 +104,7 @@ Images are selectable and movable once placed.
 
 ## Backdrop Settings
 
-Click **⚙** to configure the background behind your screenshots:
+Click **Backdrop** (top-right pill) to configure the background behind your screenshots:
 
 - **Backdrop padding** — Space between images and backdrop edge
 - **Backdrop color** — Solid fill color
@@ -135,7 +135,8 @@ Changes are previewed live. Settings persist between sessions.
 
 - After drawing most annotations, the tool automatically switches back to **Mouse** mode so you can reposition it immediately. Toggle the **pin** button next to the tools to keep the active tool instead (persists between sessions).
 - The **Picker** (`D`) stays active after a click so you can sample multiple colours; switch to another tool when done.
-- The window starts at content + 50px margin (at least as wide as the toolbar) and **grows automatically** when annotations or added images extend the canvas — never beyond the available screen space and never shrinking back. Further overflow stays reachable via pan (middle-drag) and zoom (scroll wheel).
+- The window starts at content + 50px margin (at least as wide as the pills) and **grows automatically** when annotations or added images extend the canvas — never beyond the available screen space and never shrinking back. Further overflow stays reachable via pan (middle-drag) and zoom (scroll wheel).
+- Starting Captua while an overlay is still open closes the old instance — one capture replaces the previous one.
 - Copying is instant: the window closes right away while the image is encoded, saved and handed to the clipboard in the background.
 - Use **Undo** liberally — the full history is kept in memory for the session.
 - The checkerboard pattern behind the canvas is only visible in the editor; it is **not** included in saved or copied images.

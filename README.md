@@ -9,17 +9,21 @@ A fast, lightweight screenshot annotation tool for **Linux / Wayland**.
 ## Features
 
 - **Region capture** via `grim` + `slurp`
-- **Full-screen capture** via `grim`
-- **Window capture** via `grim` + `hyprctl` (Hyprland)
-- **Frameless overlay** with `QGraphicsScene` canvas
-- **Zoom** (`Ctrl` + scroll) and **pan** (middle-click drag)
+- **Full-screen capture** via `grim` (the screen under the cursor)
+- **Window capture** on Hyprland (`hyprctl`) and Niri (`niri msg`)
+- **Frameless overlay** with `QGraphicsScene` canvas and four floating corner pills (close, actions, tools, properties)
+- **Zoom** (mouse wheel) and **pan** (middle-click drag)
+- **Self-sizing window** — content + 50px margin, grows with your annotations, always fits the toolbar, capped at the available screen space
+- **Single instance** — starting a new capture closes the previous overlay
 - **Annotations** — rectangles, circles, arrows, pen, marker, text, labels, emojis, shapes, blur, magnifier, ruler, spotlight, numbering, eyedropper
-- **Clipboard** (`Ctrl+C`) and **save** (`Ctrl+S`) support
+- **Instant copy** (`Ctrl+C`) — clipboard handoff and auto-save happen in the background, the window closes right away
+- **Save** (`Ctrl+S`) with configurable folder and filename template
 - **Undo / redo**, layer ordering, drag & drop, paste from clipboard
 - **Magnetic snap** — edges and centerlines align automatically while drawing and moving
 - **Shift constraints** — hold Shift to force squares, circles, 45° lines, straight strokes
+- **Sticky tools** — pin toggle keeps the active tool after drawing
 - **Backdrop settings** — padding, colors, gradients, corner radius, angle dial
-- **Auto-updater** — checks for new releases on startup and self-updates from git
+- **Auto-updater** — checks for new releases on startup and self-updates from the release tarball
 
 ## Install
 
@@ -52,10 +56,13 @@ cd captua
 # Create a venv and install
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -e ".[dev]"
 
-# Or run directly without installing
-./run.sh
+# Run directly from the repo
+python3 -m captua.main [--screen | --window]
+
+# Or with logging to /tmp/captua.log
+./scripts/debug.sh
 ```
 
 ### System dependencies
@@ -115,11 +122,12 @@ Create a window rule in *System Settings → Window Management → Window Rules 
 | Window class | `captua-overlay` |
 | Window types | Normal window |
 | **Position** | Centered |
-| **Size** | 80% of screen |
 | **Window matching** | Exact match |
 | **Keep above** | Force → Yes |
 | **No border** | Force → Yes |
 | **Fullscreen** | Force → No |
+
+Do not force a size — Captua sizes its window itself to the captured content plus a fixed margin.
 
 Or add the rule directly to `~/.config/kwinrulesrc`:
 
@@ -130,7 +138,6 @@ clientmachine=localhost
 wmclass=captua-overlay
 wmclassmatch=1
 position=3
-size=80
 above=true
 aboverule=3
 noborder=true
@@ -149,7 +156,7 @@ If you use a tiling extension (e.g. **Pop Shell**, **Forge**, or **Tiling Assist
 Add to `~/.config/sway/config`:
 
 ```
-for_window [app_id="captua-overlay"] floating enable, move position center, resize set 80 ppt 80 ppt, border none
+for_window [app_id="captua-overlay"] floating enable, move position center, border none
 ```
 
 ## Set Captua as your default screenshot tool
@@ -215,25 +222,27 @@ captua
 # Capture full screen
 captua --screen
 
-# Capture active window (Hyprland)
+# Capture active window (Hyprland / Niri)
 captua --window
 ```
+
+Starting Captua while an overlay is still open closes the old instance automatically.
 
 ## Shortcuts
 
 | Key | Action |
 |-----|--------|
-| `Ctrl + C` | Copy image to clipboard |
+| `Ctrl + C` | Copy image to clipboard (auto-saves and closes) |
 | `Ctrl + S` | Save image to disk |
 | `Ctrl + V` | Paste image from clipboard |
 | `Ctrl + Z` | Undo |
 | `Ctrl + Shift + Z` / `Ctrl + Y` | Redo |
 | `?` | Toggle keyboard-shortcut overlay |
-| `Ctrl + Wheel` | Zoom |
+| `Wheel` | Zoom |
 | `Middle-click drag` | Pan |
 | `Delete` / `Backspace` | Remove selected items |
 | `PgUp` / `PgDn` | Change layer order |
-| `Escape` | Close |
+| `Escape` | Clear text focus → clear selection → close |
 
 See [`docs/GUIDE.md`](docs/GUIDE.md) for the full user guide.
 

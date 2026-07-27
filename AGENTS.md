@@ -4,7 +4,7 @@
 
 Captua is a fast, lightweight screenshot annotation tool (a Shottr clone) for **Linux / Wayland only**, written in Python with PySide6 (Qt6). It captures a region, screen, or window, opens it in a frameless overlay window with a `QGraphicsScene` canvas, and lets the user annotate, then copy or save the result.
 
-- Current version: **0.4.1** (kept in sync in `captua/__init__.py` and `pyproject.toml`)
+- Current version: **0.6.0** (kept in sync in `captua/__init__.py` and `pyproject.toml`)
 - Entry point: console script `captua = captua.main:main`
 - CLI modes: `captua` (region, default), `captua --screen|-s`, `captua --window|-w`, `captua --help|-h`
 - Repository: https://github.com/KernicDE/captua
@@ -26,10 +26,11 @@ Captua is a fast, lightweight screenshot annotation tool (a Shottr clone) for **
 captua/
   __init__.py       # Package meta (__version__)
   main.py           # Entry point: QApplication setup, CLI arg parsing, capture mode dispatch,
-                    # screen selection, async update check (3 s delayed)
+                    # screen selection, single-instance enforcement (ensure_single_instance),
+                    # async update check (3 s delayed)
   capture.py        # Screenshot capture via grim/slurp/hyprctl/niri (subprocess)
-  overlay.py        # Frameless OverlayWindow (QMainWindow): toolbar + canvas wiring,
-                    # fixed window sizing (compute_window_size), render/export,
+  overlay.py        # Frameless OverlayWindow (QMainWindow): pill + canvas wiring,
+                    # window sizing (compute_window_size, grow-only), render/export,
                     # clipboard (also shells out to wl-copy), background auto-save on copy
   canvas.py         # CanvasScene (QGraphicsScene) + CanvasView (QGraphicsView): zoom/pan,
                     # resize handles, tool routing, shortcuts, magnetic snap (snap_rect/snap_point),
@@ -85,14 +86,14 @@ run.sh              # NOTE: currently a hardcoded launcher for one user's instal
 - **Window sizing**: `compute_window_size()` (overlay.py) sizes the window to content + 50px margin + pill zones (top and bottom), capped at the available screen space (`availableGeometry()` minus 40px). Minimum width = `Toolbar.full_width()` — enough for both pill rows (close+actions, tools+props) side by side, refreshed in `showEvent` via `refresh_full_width()` because pre-show size hints are unreliable. `_on_scene_rect_fitted()` grows the window (never shrinks) when content extends past the image edge. After `showEvent`, the size is re-asserted twice via `QTimer` (`_reassert_size`) because compositors may impose a default height on new floating windows (e.g. a global niri `default-window-height` rule).
 - **Floating pills**: the four toolbar pills are direct children of `OverlayWindow` (not in the layout), positioned to the corners by `_place_pills()` (window `resizeEvent` + `pills_changed` signal). The canvas fills the whole window; `_fit_image()` centers content between the equal top/bottom pill zones. Plain QWidgets need `WA_StyledBackground` for the pill stylesheet background to paint.
 - **Single instance**: `ensure_single_instance()` (main.py) runs at startup (after `--help` handling). It reads `$XDG_RUNTIME_DIR/captua-overlay-<uid>.pid`, verifies the recorded PID is a live captua process (`/proc/<pid>/cmdline` guard against PID recycling), sends SIGTERM with a 2s grace period, then writes its own PID (removed via `atexit`).
-- **Auto-switch to select**: `CanvasView` emits `tool_finished` after non-select tools complete; `OverlayWindow` switches back to select mode unless **sticky tools** are enabled (pin toggle in the toolbar, persisted as `sticky_tools`).
+- **Auto-switch to select**: `CanvasView` emits `tool_finished` after non-select tools complete; `OverlayWindow` switches back to select mode unless **sticky tools** are enabled (pin toggle in the bottom-left pill, persisted as `sticky_tools`).
 - **Auto-save on copy**: when `auto_save_on_copy` is true (default), `Ctrl+C` / Copy renders once, sets the `QClipboard` image synchronously, then encodes PNG once in a background thread that also writes `<screenshots_folder>/<template>.png` (default `~/Pictures/Screenshots/captua-{timestamp}.png`) and feeds `wl-copy`. The thread reports back via the `copy_finished` signal; the window closes immediately on success (no artificial delay) or stays open with an error dialog on save failure.
 - **Esc hierarchy**: `Esc` clears text focus → closes the shortcut overlay → clears the selection → and only then closes the window.
-- **Contextual properties**: the toolbar properties panel (colour, width, fill alpha) is only visible when a drawing tool is active or a single item is selected.
+- **Contextual properties**: the bottom-right pill (stroke colour/width, fill colour/alpha) is only visible when a drawing tool is active or a single item is selected.
 - **Keyboard shortcut overlay**: `?` toggles a help overlay listing all shortcuts; `Esc` or `?` dismisses it.
 - **Auto-updater**: 3 s after startup the app queries the GitHub releases API. If a newer, non-skipped version exists, a non-modal dialog offers **Update Now** (self-update, see below), **Ask Again Later**, or **Skip This Version** (persisted as `skipped_version`).
 - **Self-update**: `SelfUpdater` runs `pip install --upgrade <github release tarball URL>` via `QProcess` (with a `--user` fallback on permission errors), then restarts with `os.execl` after chdir-ing to a temp dir so a git clone's source folder cannot shadow the installed package. (It no longer uses `git pull`.)
-- **Magnetic snap**: toolbar toggle (`snap_enabled` setting). `snap_rect()` aligns edges/centerlines of a moving item to all other items (15 px tolerance); drawing tools call `snap_point()` unless Shift is held.
+- **Magnetic snap**: top-right pill toggle (`snap_enabled` setting). `snap_rect()` aligns edges/centerlines of a moving item to all other items (15 px tolerance); drawing tools call `snap_point()` unless Shift is held.
 - **Shift constraints while drawing**: Rectangle→square, Ellipse→circle, Line/Arrow→45° snap, Pen→Bezier smoothing, Marker→straight line, Spotlight/Blur→square.
 - **Eyedropper**: `D` shortcut. A viewport QLabel overlay (not a scene item) shows live HEX+RGB under the cursor; click copies HEX to the clipboard. Stays active until another tool is chosen.
 - **Spotlight resize**: `SpotlightItem` exposes `rect()`/`setRect()` so the `CanvasView` resize handles work on the inner transparent rectangle.
@@ -126,7 +127,7 @@ QT_QPA_PLATFORM=offscreen pytest            # all tests
 QT_QPA_PLATFORM=offscreen pytest tests/test_history.py -v
 ```
 
-Known caveat: the two `TestCaptureWindow` tests in `tests/test_capture.py` assume the Hyprland code path and fail on a Niri session (`XDG_CURRENT_DESKTOP=niri` routes `capture_window()` to the Niri path). This is a pre-existing, environment-dependent failure — as of writing, the suite is 25 passed / 2 failed on a Niri desktop, 27 passed elsewhere.
+Known caveat: the two `TestCaptureWindow` tests in `tests/test_capture.py` assume the Hyprland code path and fail on a Niri session (`XDG_CURRENT_DESKTOP=niri` routes `capture_window()` to the Niri path). This is a pre-existing, environment-dependent failure — as of writing, the suite is 46 passed / 2 failed on a Niri desktop, 48 passed elsewhere.
 
 No linter config. Type-check with `mypy captua/`.
 
