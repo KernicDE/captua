@@ -133,6 +133,14 @@ PILL_STYLE = f"""
         border: 1px solid {PILL_BORDER};
         border-radius: {RADIUS_PILL}px;
     }}
+    QWidget#toolbarPill QLabel {{
+        background: transparent;
+        border: none;
+    }}
+    QWidget#toolbarPill QSlider {{
+        background: transparent;
+        border: none;
+    }}
 """
 
 TOAST_STYLE = (
@@ -155,32 +163,5 @@ MENU_STYLE = f"""
     }}
     QMenu::item:selected {{
         background-color: {HOVER_BG};
-    }}
-"""
-
-# Slim horizontal scrollbar for the toolbar scroll area — only appears when
-# the window is narrower than the toolbar.
-TOOLBAR_SCROLLAREA_STYLE = f"""
-    QScrollArea {{
-        background: transparent;
-    }}
-    QScrollBar:horizontal {{
-        background: transparent;
-        height: 6px;
-        margin: 0 12px;
-    }}
-    QScrollBar::handle:horizontal {{
-        background: {PILL_BORDER};
-        border-radius: 3px;
-        min-width: 24px;
-    }}
-    QScrollBar::handle:horizontal:hover {{
-        background: {TEXT_DIM};
-    }}
-    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
-        width: 0;
-    }}
-    QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
-        background: none;
     }}
 """

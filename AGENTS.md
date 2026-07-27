@@ -34,8 +34,10 @@ captua/
   canvas.py         # CanvasScene (QGraphicsScene) + CanvasView (QGraphicsView): zoom/pan,
                     # resize handles, tool routing, shortcuts, magnetic snap (snap_rect/snap_point),
                     # backdrop draw helper, `?` shortcut overlay
-  toolbar.py        # Floating pill toolbar: close/save/copy actions, overflow menu,
-                    # tool buttons with icons, sticky-tools pin, contextual property controls
+  toolbar.py        # Four floating pill toolbars (corners): close (top-left),
+                    # actions Backdrop/Snap/Import/Capture/Save/Copy (top-right),
+                    # tool buttons + sticky pin (bottom-left), contextual
+                    # stroke/fill properties (bottom-right)
   theme.py          # Central palette + stylesheet builders (single accent, pill styles)
   icons.py          # Programmatically-drawn monochrome 20×20 toolbar icons via QPainter
   tools.py          # Annotation tool classes (SelectTool, CropTool, RectangleTool, EllipseTool,
@@ -80,7 +82,8 @@ run.sh              # NOTE: currently a hardcoded launcher for one user's instal
 ## Key Behaviours
 
 - **Backdrop in exports**: `OverlayWindow.render_to_pixmap()` computes `itemsBoundingRect()`, draws the backdrop, then renders scene items on top. The checkerboard is drawn in `drawBackground()` but intentionally skipped in exports.
-- **Window sizing**: `compute_window_size()` (overlay.py) sizes the window to content + 50px margin + toolbar height, capped at the available screen space (`availableGeometry()` minus 40px). Minimum width = the pill toolbar's widest state (`Toolbar.full_width()`, properties panel visible, refreshed in `showEvent` via `refresh_full_width()` because pre-show size hints are unreliable). `_on_scene_rect_fitted()` grows the window (never shrinks) when content extends past the image edge. After `showEvent`, the size is re-asserted twice via `QTimer` (`_reassert_size`) because compositors may impose a default height on new floating windows (e.g. a global niri `default-window-height` rule).
+- **Window sizing**: `compute_window_size()` (overlay.py) sizes the window to content + 50px margin + pill zones (top and bottom), capped at the available screen space (`availableGeometry()` minus 40px). Minimum width = `Toolbar.full_width()` — enough for both pill rows (close+actions, tools+props) side by side, refreshed in `showEvent` via `refresh_full_width()` because pre-show size hints are unreliable. `_on_scene_rect_fitted()` grows the window (never shrinks) when content extends past the image edge. After `showEvent`, the size is re-asserted twice via `QTimer` (`_reassert_size`) because compositors may impose a default height on new floating windows (e.g. a global niri `default-window-height` rule).
+- **Floating pills**: the four toolbar pills are direct children of `OverlayWindow` (not in the layout), positioned to the corners by `_place_pills()` (window `resizeEvent` + `pills_changed` signal). The canvas fills the whole window; `_fit_image()` centers content between the equal top/bottom pill zones. Plain QWidgets need `WA_StyledBackground` for the pill stylesheet background to paint.
 - **Single instance**: `ensure_single_instance()` (main.py) runs at startup (after `--help` handling). It reads `$XDG_RUNTIME_DIR/captua-overlay-<uid>.pid`, verifies the recorded PID is a live captua process (`/proc/<pid>/cmdline` guard against PID recycling), sends SIGTERM with a 2s grace period, then writes its own PID (removed via `atexit`).
 - **Auto-switch to select**: `CanvasView` emits `tool_finished` after non-select tools complete; `OverlayWindow` switches back to select mode unless **sticky tools** are enabled (pin toggle in the toolbar, persisted as `sticky_tools`).
 - **Auto-save on copy**: when `auto_save_on_copy` is true (default), `Ctrl+C` / Copy renders once, sets the `QClipboard` image synchronously, then encodes PNG once in a background thread that also writes `<screenshots_folder>/<template>.png` (default `~/Pictures/Screenshots/captua-{timestamp}.png`) and feeds `wl-copy`. The thread reports back via the `copy_finished` signal; the window closes immediately on success (no artificial delay) or stays open with an error dialog on save failure.

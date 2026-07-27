@@ -1,4 +1,4 @@
-"""Pill toolbar: actions row, tools row and contextual property controls."""
+"""Floating pill toolbars: four corner clusters (close, actions, tools, properties)."""
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QKeyEvent, QPixmap
@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSlider,
-    QVBoxLayout,
     QWidget,
 )
 
@@ -28,6 +27,22 @@ from .theme import (
     TEXT,
     TOOL_BUTTON_STYLE,
 )
+
+_PILL_HEIGHT = 40
+
+
+def _make_pill(parent: QWidget) -> tuple[QWidget, QHBoxLayout]:
+    """Single floating pill container with a horizontal layout."""
+    pill = QWidget(parent)
+    pill.setObjectName("toolbarPill")
+    # Plain QWidgets only paint stylesheet backgrounds with this set
+    pill.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+    pill.setStyleSheet(PILL_STYLE)
+    pill.setFixedHeight(_PILL_HEIGHT)
+    layout = QHBoxLayout(pill)
+    layout.setContentsMargins(8, 4, 8, 4)
+    layout.setSpacing(4)
+    return pill, layout
 
 
 def _make_separator() -> QFrame:
@@ -104,7 +119,16 @@ class ColorSwatch(QPushButton):
 
 
 class Toolbar(QWidget):
-    """Floating pill toolbar with actions, tool buttons and property controls."""
+    """Owns the four floating pill toolbars and all tool/property logic.
+
+    The pills are direct children of the overlay window and are positioned
+    by it (corners). This widget itself is a hidden logic container:
+
+    - pill_close  (top-left):     close button
+    - pill_actions(top-right):    Backdrop, Snap, Import, Capture | Save, Copy
+    - pill_tools  (bottom-left):  the 17 tool buttons + sticky pin
+    - pill_props  (bottom-right): contextual stroke/fill controls
+    """
 
     tool_changed = Signal(str)
     line_color_changed = Signal(QColor)
@@ -122,34 +146,29 @@ class Toolbar(QWidget):
     magnifier_zoom_changed = Signal(float)
     snap_toggled = Signal(bool)
     sticky_toggled = Signal(bool)
+    pills_changed = Signal()
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
-        self.setObjectName("toolbarPill")
-        self.setFixedHeight(80)
-        self.setStyleSheet(PILL_STYLE)
+        # The container itself never shows; only the pills do.
+        self.hide()
 
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(12, 6, 12, 6)
-        main_layout.setSpacing(4)
-
-        # ---- top row: window + file actions ----------------------------------
-        action_row = QHBoxLayout()
-        action_row.setSpacing(6)
-
+        # ---- top-left: close --------------------------------------------------
+        self.pill_close, close_layout = _make_pill(parent)
         self._close_btn = ToolButton("close", "Close", "Esc")
         self._close_btn.setFixedSize(28, 28)
         self._close_btn.clicked.connect(self.close_triggered.emit)
-        action_row.addWidget(self._close_btn)
+        close_layout.addWidget(self._close_btn)
 
-        action_row.addStretch()
+        # ---- top-right: actions -------------------------------------------------
+        self.pill_actions, action_layout = _make_pill(parent)
 
         self._backdrop_btn = QPushButton("Backdrop")
         self._backdrop_btn.setFixedHeight(28)
         self._backdrop_btn.setStyleSheet(ACTION_BUTTON_STYLE)
         self._backdrop_btn.setToolTip("Backdrop settings")
         self._backdrop_btn.clicked.connect(self.backdrop_settings_triggered.emit)
-        action_row.addWidget(self._backdrop_btn)
+        action_layout.addWidget(self._backdrop_btn)
 
         self._snap_btn = QPushButton("Snap")
         self._snap_btn.setCheckable(True)
@@ -158,44 +177,34 @@ class Toolbar(QWidget):
         self._snap_btn.setStyleSheet(ACTION_BUTTON_STYLE)
         self._snap_btn.setToolTip("Toggle magnetic snap")
         self._snap_btn.clicked.connect(lambda checked: self.snap_toggled.emit(checked))
-        action_row.addWidget(self._snap_btn)
+        action_layout.addWidget(self._snap_btn)
 
-        # Overflow menu for rarely used actions
-        self._overflow_btn = QPushButton()
-        more_pm = icon("more")
-        self._overflow_btn.setIcon(more_pm)
-        self._overflow_btn.setIconSize(more_pm.size())
-        self._overflow_btn.setFixedSize(32, 28)
-        self._overflow_btn.setStyleSheet(ACTION_BUTTON_STYLE)
-        self._overflow_btn.setToolTip("More actions")
-        overflow = QMenu(self._overflow_btn)
-        overflow.setStyleSheet(MENU_STYLE)
-        overflow.addAction("Import image…", self.import_image_triggered.emit)
-        overflow.addAction("Capture region", self.capture_triggered.emit)
-        self._overflow_btn.setMenu(overflow)
-        action_row.addWidget(self._overflow_btn)
+        self._import_btn = self._make_icon_action("import", "Import image…")
+        self._import_btn.clicked.connect(self.import_image_triggered.emit)
+        action_layout.addWidget(self._import_btn)
 
-        action_row.addWidget(_make_separator())
+        self._capture_btn = self._make_icon_action("capture", "Capture region")
+        self._capture_btn.clicked.connect(self.capture_triggered.emit)
+        action_layout.addWidget(self._capture_btn)
+
+        action_layout.addWidget(_make_separator())
 
         self._save_btn = QPushButton("Save")
         self._save_btn.setFixedHeight(28)
         self._save_btn.setStyleSheet(ACTION_BUTTON_STYLE)
         self._save_btn.setToolTip("Save (Ctrl+S)")
-        action_row.addWidget(self._save_btn)
         self._save_btn.clicked.connect(self.save_triggered.emit)
+        action_layout.addWidget(self._save_btn)
 
         self._copy_btn = QPushButton("Copy")
         self._copy_btn.setFixedHeight(28)
         self._copy_btn.setStyleSheet(PRIMARY_BUTTON_STYLE)
         self._copy_btn.setToolTip("Copy & save (Ctrl+C)")
-        action_row.addWidget(self._copy_btn)
         self._copy_btn.clicked.connect(self.copy_triggered.emit)
+        action_layout.addWidget(self._copy_btn)
 
-        main_layout.addLayout(action_row)
-
-        # ---- bottom row: tools + properties -----------------------------------
-        bottom_row = QHBoxLayout()
-        bottom_row.setSpacing(4)
+        # ---- bottom-left: tools --------------------------------------------------
+        self.pill_tools, tools_layout = _make_pill(parent)
 
         self._buttons: dict[str, ToolButton] = {}
         self._active = "select"
@@ -224,7 +233,7 @@ class Toolbar(QWidget):
             btn = ToolButton(icon_name, name, sc)
             btn.clicked.connect(lambda checked, k=key: self._on_tool_clicked(k))
             self._buttons[key] = btn
-            bottom_row.addWidget(btn)
+            tools_layout.addWidget(btn)
 
         self._buttons["select"].setChecked(True)
 
@@ -233,23 +242,11 @@ class Toolbar(QWidget):
         self._sticky_btn.setFixedSize(28, 32)
         self._sticky_btn.setChecked(False)
         self._sticky_btn.clicked.connect(lambda checked: self.sticky_toggled.emit(checked))
-        bottom_row.addWidget(self._sticky_btn)
+        tools_layout.addWidget(self._sticky_btn)
 
-        # Properties panel (contextual) — wrapped in a fixed-width container
-        # so showing/hiding it never shifts the tool buttons.
-        self._props_container = QWidget(self)
-        self._props_container.setStyleSheet("background: transparent; border: none;")
-        container_layout = QHBoxLayout(self._props_container)
-        container_layout.setContentsMargins(0, 0, 0, 0)
-        container_layout.setSpacing(0)
+        # ---- bottom-right: contextual properties ---------------------------------
+        self.pill_props, props_layout = _make_pill(parent)
 
-        self._props_widget = QWidget(self._props_container)
-        self._props_widget.setStyleSheet("background: transparent; border: none;")
-        props_layout = QHBoxLayout(self._props_widget)
-        props_layout.setContentsMargins(0, 0, 0, 0)
-        props_layout.setSpacing(4)
-
-        # Line color + width (stroke group)
         stroke_icon = QLabel()
         stroke_icon.setPixmap(icon("stroke"))
         stroke_icon.setToolTip("Stroke colour and width")
@@ -258,8 +255,6 @@ class Toolbar(QWidget):
         self._line_color_btn = ColorSwatch()
         self._line_color_btn.color_changed.connect(self.line_color_changed.emit)
         props_layout.addWidget(self._line_color_btn)
-
-        props_layout.addSpacing(4)
 
         self._line_width_slider = QSlider(Qt.Orientation.Horizontal)
         self._line_width_slider.setRange(1, 20)
@@ -285,7 +280,6 @@ class Toolbar(QWidget):
 
         props_layout.addSpacing(6)
 
-        # Fill color + alpha (fill group)
         fill_icon = QLabel()
         fill_icon.setPixmap(icon("fill"))
         fill_icon.setToolTip("Fill colour and opacity")
@@ -294,8 +288,6 @@ class Toolbar(QWidget):
         self._fill_color_btn = ColorSwatch()
         self._fill_color_btn.color_changed.connect(self.fill_color_changed.emit)
         props_layout.addWidget(self._fill_color_btn)
-
-        props_layout.addSpacing(4)
 
         self._fill_alpha_slider = QSlider(Qt.Orientation.Horizontal)
         self._fill_alpha_slider.setRange(0, 100)
@@ -319,14 +311,15 @@ class Toolbar(QWidget):
         props_layout.addWidget(self._fill_alpha_edit)
         self._on_fill_alpha_changed(50)
 
-        container_layout.addWidget(self._props_widget)
+        # Freeze each pill at its natural width
+        self._pills = [self.pill_close, self.pill_actions, self.pill_tools, self.pill_props]
+        self._props_visible = True  # until the first set_properties_visible call
+        for pill in self._pills:
+            pill.layout().activate()
+            pill.setFixedWidth(pill.sizeHint().width())
+            pill.hide()
 
-        self._props_sep = _make_separator()
-        bottom_row.addWidget(self._props_sep)
-        bottom_row.addSpacing(6)
-        bottom_row.addWidget(self._props_container)
-        bottom_row.addStretch()
-        main_layout.addLayout(bottom_row)
+        self._full_width = self._compute_full_width()
 
         # Popups (lazy)
         self._shape_popup: ShapePopup | None = None
@@ -334,12 +327,43 @@ class Toolbar(QWidget):
         self._mag_zoom_popup: MagnifierPopup | None = None
         self._current_mag_zoom: float = 2.0
 
-        # Capture the widest state (properties panel visible) before
-        # anything is hidden — the window uses it as its minimum width so
-        # the pill always fits, whatever tool is active.
-        self.layout().activate()
-        self._full_width = self.sizeHint().width()
-        self.setMinimumWidth(0)
+    @staticmethod
+    def _make_icon_action(icon_name: str, tooltip: str) -> QPushButton:
+        btn = QPushButton()
+        pm = icon(icon_name)
+        btn.setIcon(pm)
+        btn.setIconSize(pm.size())
+        btn.setFixedSize(28, 28)
+        btn.setStyleSheet(ACTION_BUTTON_STYLE)
+        btn.setToolTip(tooltip)
+        return btn
+
+    def _compute_full_width(self) -> int:
+        """Window width needed so both pill rows fit side by side (+margins)."""
+        top = self.pill_close.width() + self.pill_actions.width()
+        bottom = self.pill_tools.width() + self.pill_props.width()
+        return max(top, bottom) + 40  # outer margins + gap between pills
+
+    # -- pill visibility / sizing (called from overlay) -------------------------
+
+    def set_pills_visible(self, visible: bool) -> None:
+        for pill in self._pills:
+            pill.setVisible(visible)
+        if visible and not self._props_visible:
+            self.pill_props.hide()
+        self.pills_changed.emit()
+
+    def full_width(self) -> int:
+        """Minimum window width so all four pills fit (see _compute_full_width)."""
+        return self._full_width
+
+    def refresh_full_width(self) -> None:
+        """Recompute pill widths once the window is shown (font metrics are
+        unreliable before the first show)."""
+        for pill in self._pills:
+            pill.setFixedWidth(pill.sizeHint().width())
+        self._full_width = self._compute_full_width()
+        self.pills_changed.emit()
 
     # -- tool routing ---------------------------------------------------------
 
@@ -439,34 +463,10 @@ class Toolbar(QWidget):
     def active_tool(self) -> str:
         return self._active
 
-    def full_width(self) -> int:
-        """Width of the pill with the properties panel visible (widest state)."""
-        return self._full_width
-
-    def refresh_full_width(self) -> None:
-        """Recompute the widest pill width once the window is shown.
-
-        sizeHint() before the first show is unreliable (font metrics are
-        not final yet), so the overlay calls this from showEvent before
-        sizing the window."""
-        props_visible = self._props_widget.isVisible()
-        self._props_widget.setVisible(True)
-        self._props_sep.setVisible(True)
-        self.layout().activate()
-        self._full_width = self.sizeHint().width()
-        self._props_widget.setVisible(props_visible)
-        self._props_sep.setVisible(props_visible)
-        self.layout().activate()
-        self.setFixedWidth(self.sizeHint().width())
-
     def set_properties_visible(self, visible: bool) -> None:
-        self._props_widget.setVisible(visible)
-        self._props_sep.setVisible(visible)
-        # Keep the pill exactly as wide as its current content; hidden
-        # widgets don't count towards sizeHint(). The tool buttons are
-        # left-aligned, so nothing shifts when the width changes.
-        self.layout().activate()
-        self.setFixedWidth(self.sizeHint().width())
+        self._props_visible = visible
+        self.pill_props.setVisible(visible and self.pill_tools.isVisible())
+        self.pills_changed.emit()
 
     # -- change handlers -------------------------------------------------------
 

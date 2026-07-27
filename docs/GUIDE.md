@@ -24,12 +24,12 @@ pacman -S python python-pyside6 grim slurp wl-clipboard
 
 ## Toolbar
 
-The floating pill bar at the top contains:
+Four floating pills in the window corners:
 
-- **Top row:** Close (`Esc`) on the left; Backdrop settings, Snap toggle, an overflow menu (⋯: Import image, Capture region), **Save** (`Ctrl+S`) and the primary **Copy** button (`Ctrl+C`) on the right
-- **Bottom row:** the tool buttons (see table below), a **pin toggle** to keep the active tool after drawing, and the contextual property controls
-- **Line color / width** — Stroke appearance for shapes, lines, arrows, etc.
-- **Fill color / opacity** — Fill appearance for closed shapes
+- **Top-left:** Close (`Esc`)
+- **Top-right:** Backdrop settings, Snap toggle, Import image, Capture region, **Save** (`Ctrl+S`) and the primary **Copy** button (`Ctrl+C`)
+- **Bottom-left:** the tool buttons (see table below) plus a **pin toggle** to keep the active tool after drawing
+- **Bottom-right:** the contextual property controls (stroke colour/width, fill colour/opacity) — only visible when a drawing tool is active or an item is selected
 
 ## Tools
 

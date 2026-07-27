@@ -40,12 +40,10 @@ from PySide6.QtGui import QColor, QImage, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
-    QFrame,
     QGraphicsPixmapItem,
     QLabel,
     QMainWindow,
     QMessageBox,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -53,7 +51,7 @@ from PySide6.QtWidgets import (
 from .backdrop import BackdropPopup
 from .canvas import CanvasScene, CanvasView, draw_backdrop
 from .settings import apply_to_scene, extract_from_scene, load_settings, save_settings
-from .theme import TOAST_STYLE, TOOLBAR_SCROLLAREA_STYLE, WINDOW_BG
+from .theme import TOAST_STYLE, WINDOW_BG
 from .toolbar import Toolbar
 from .tools import (
     ArrowTool,
@@ -127,32 +125,6 @@ def _deliver_png(
     return True, saved_name
 
 
-class ToolbarScrollArea(QScrollArea):
-    """Thin horizontal scroll wrapper that keeps the toolbar independent of window width."""
-
-    def __init__(self, toolbar: "Toolbar", parent=None) -> None:
-        super().__init__(parent)
-        self.setWidget(toolbar)
-        self.setWidgetResizable(False)
-        # 80px toolbar + room for a slim scrollbar that appears only when
-        # the window is narrower than the toolbar
-        self.setFixedHeight(88)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setFrameShape(QFrame.Shape.NoFrame)
-        self.setStyleSheet(TOOLBAR_SCROLLAREA_STYLE)
-        self.setMinimumWidth(0)
-        # Center the pill when it fits; alignment is ignored once it is
-        # wider than the viewport and scrolling kicks in.
-        self.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
-
-    def wheelEvent(self, event) -> None:
-        self.horizontalScrollBar().setValue(
-            self.horizontalScrollBar().value() - event.angleDelta().y()
-        )
-        event.accept()
-
-
 class OverlayWindow(QMainWindow):
     """
     A frameless, floating window for Hyprland/Wayland.
@@ -181,19 +153,19 @@ class OverlayWindow(QMainWindow):
         self.setStyleSheet(f"background-color: {WINDOW_BG};")
         self.setAcceptDrops(True)
 
-        # Central widget with vertical layout; margins let the pill toolbar
-        # and the canvas float above the window background.
+        # Central widget: the canvas fills the whole window; the toolbar
+        # pills float on top of it (not part of the layout).
         central = QWidget(self)
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
         layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setSpacing(0)
 
-        # Toolbar wrapped in a scroll area so it never forces the window
-        # width — it scrolls horizontally when the window is narrower.
+        # Four floating pill toolbars (corners) — created as children of
+        # this window by Toolbar, positioned in _place_pills().
         self._toolbar = Toolbar(self)
-        self._toolbar_scroll = ToolbarScrollArea(self._toolbar, self)
-        layout.addWidget(self._toolbar_scroll)
+        self._toolbar.pills_changed.connect(self._place_pills)
+        self._pills_hidden = False
         self.setMinimumWidth(280)
         self._backdrop_popup: BackdropPopup | None = None
 
@@ -203,7 +175,7 @@ class OverlayWindow(QMainWindow):
         self._toast.setStyleSheet(TOAST_STYLE)
         self._toast.hide()
 
-        # Canvas fills the rest of the window
+        # Canvas fills the whole window below the floating toolbar
         self._scene = CanvasScene(self)
         self._view = CanvasView(self._scene, self)
         layout.addWidget(self._view)
@@ -439,13 +411,14 @@ class OverlayWindow(QMainWindow):
         self._backdrop_popup.show_below(self._toolbar.backdrop_button())
 
     def set_crop_mode(self, enabled: bool) -> None:
-        """Hide toolbar and activate crop tool; called for region/window modes."""
+        """Hide toolbar pills and activate crop tool; called for region/window modes."""
+        self._pills_hidden = enabled
         if enabled:
-            self._toolbar.hide()
+            self._toolbar.set_pills_visible(False)
             self._set_tool("crop")
             self._toolbar.set_tool("crop")
         else:
-            self._toolbar.show()
+            self._toolbar.set_pills_visible(True)
             self._set_tool("select")
             self._toolbar.set_tool("select")
 
@@ -471,6 +444,27 @@ class OverlayWindow(QMainWindow):
             max_h = 1080
         return margin, max_w, max_h
 
+    def _toolbar_zone(self) -> int:
+        """Vertical space reserved for the floating pills (top and bottom)."""
+        return 2 * (self._toolbar.pill_close.height() + 16)
+
+    def _place_pills(self) -> None:
+        """Put the floating pills into the four window corners."""
+        tb = self._toolbar
+        m = 10
+        gap = 8
+        # top-left: close — top-right: actions
+        tb.pill_close.move(m, m)
+        ax = max(m + tb.pill_close.width() + gap, self.width() - m - tb.pill_actions.width())
+        tb.pill_actions.move(ax, m)
+        # bottom-left: tools — bottom-right: contextual properties
+        yb = self.height() - m - tb.pill_tools.height()
+        tb.pill_tools.move(m, yb)
+        px = max(m + tb.pill_tools.width() + gap, self.width() - m - tb.pill_props.width())
+        tb.pill_props.move(px, yb)
+        for pill in (tb.pill_close, tb.pill_actions, tb.pill_tools, tb.pill_props):
+            pill.raise_()
+
     def _resize_for_scene(self) -> None:
         """Resize window to the actual content (screenshot + annotations)
         plus a fixed 50px margin and the toolbar height. Deliberately ignores
@@ -479,11 +473,11 @@ class OverlayWindow(QMainWindow):
         central layout margins) so it fits without scrolling."""
         _, max_w, max_h = self._screen_constraints()
         content_rect = self._scene.content_rect()
-        toolbar_w = self._toolbar.full_width() + 20  # 10px central layout margins
+        toolbar_w = self._toolbar.full_width()  # all four pills + margins
         new_w, new_h = compute_window_size(
             content_rect.width(),
             content_rect.height(),
-            self._toolbar_scroll.height(),
+            self._toolbar_zone(),
             max_w,
             max_h,
             toolbar_w=toolbar_w,
@@ -504,11 +498,11 @@ class OverlayWindow(QMainWindow):
         pan/zoom."""
         _, max_w, max_h = self._screen_constraints()
         content_rect = self._scene.content_rect()
-        toolbar_w = self._toolbar.full_width() + 20
+        toolbar_w = self._toolbar.full_width()
         need_w, need_h = compute_window_size(
             content_rect.width(),
             content_rect.height(),
-            self._toolbar_scroll.height(),
+            self._toolbar_zone(),
             max_w,
             max_h,
             toolbar_w=toolbar_w,
@@ -540,7 +534,11 @@ class OverlayWindow(QMainWindow):
         full sceneRect — the sceneRect also carries the decorative, user-
         configurable backdrop padding (up to 120px), which must never force
         the real screenshot to shrink just because the window (correctly
-        sized to content + 50px) is smaller than that padded sceneRect."""
+        sized to content + 50px) is smaller than that padded sceneRect.
+
+        The content is centered in the viewport — the floating pills reserve
+        equal zones at the top and bottom, so a plain center keeps the
+        screenshot clear of them."""
         content_rect = self._scene.content_rect()
         view_rect = self._view.viewport().rect()
         if content_rect.width() <= view_rect.width() and content_rect.height() <= view_rect.height():
@@ -551,7 +549,7 @@ class OverlayWindow(QMainWindow):
             # Screen-capped window: scale to fit, keep margin where possible
             scale = min(
                 max((view_rect.width() - _VIEWPORT_MARGIN * 2), 1) / content_rect.width(),
-                max((view_rect.height() - _VIEWPORT_MARGIN * 2), 1) / content_rect.height(),
+                max((view_rect.height() - self._toolbar_zone() - _VIEWPORT_MARGIN), 1) / content_rect.height(),
             )
             self._view.resetTransform()
             self._view.scale(scale, scale)
@@ -578,6 +576,8 @@ class OverlayWindow(QMainWindow):
             # computed size once the compositor has had its say.
             QTimer.singleShot(120, self._reassert_size)
             QTimer.singleShot(500, self._reassert_size)
+        self._toolbar.set_pills_visible(not self._pills_hidden)
+        self._place_pills()
         # Grab keyboard focus immediately so modifier keys (e.g. Ctrl for
         # zoom) are recognised without requiring a click into the canvas first.
         self.activateWindow()
@@ -606,6 +606,7 @@ class OverlayWindow(QMainWindow):
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
+        self._place_pills()
 
     def add_capture(self, pixmap: QPixmap, direction: str = "vertical") -> None:
         """Stitch a new capture onto the existing canvas."""

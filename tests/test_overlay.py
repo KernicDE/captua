@@ -131,9 +131,9 @@ class TestWindowSizing:
         # Offscreen screens are tiny (800x600); pretend a real one
         monkeypatch.setattr(win, "_screen_constraints", lambda: (40, 5000, 5000))
         win.show()  # showEvent refreshes full_width with final font metrics
-        # Even with a tiny screenshot the window fits the widest pill state
-        # (properties panel visible), so nothing is clipped.
-        expected = win._toolbar.full_width() + 20
+        # Even with a tiny screenshot the window fits all four pills
+        # (properties pill visible), so nothing is clipped.
+        expected = win._toolbar.full_width()
         assert win.width() >= expected
 
     def test_window_grows_with_content(self, qtbot, win, monkeypatch) -> None:
