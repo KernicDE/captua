@@ -164,6 +164,13 @@ def icon(name: str, active: bool = False) -> QPixmap:
         p.drawEllipse(QRectF(6, 2, 8, 8))
         p.drawLine(QPointF(10, 10), QPointF(10, 18))
 
+    elif name == "more":
+        # Three filled dots (horizontal overflow ellipsis)
+        p.setBrush(color)
+        p.setPen(Qt.PenStyle.NoPen)
+        for cx in (3, 8, 13):
+            p.drawEllipse(QRectF(cx, 8, 4, 4))
+
     elif name == "save":
         p.drawRect(QRectF(4, 3, 12, 14))
         p.drawLine(QPointF(7, 3), QPointF(7, 8))

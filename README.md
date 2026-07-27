@@ -104,6 +104,8 @@ window-rule {
 
 Floating is a compositor decision — Captua requests a frameless window sized to the screenshot (content + 50px margin, capped at the available screen space), and the rule above keeps it floating instead of tiled.
 
+Note: a **global** window-rule with `default-window-height` (e.g. `proportion 1.0`) also matches captua-overlay and would force the overlay to full screen height. Captua re-asserts its computed size shortly after opening, which wins over the default — but a matching `default-window-height` in a captua-specific rule would still override it, so don't set one.
+
 ### KDE Plasma (KWin)
 
 Create a window rule in *System Settings → Window Management → Window Rules → New*:

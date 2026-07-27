@@ -20,6 +20,7 @@ from .popups import EmojiPopup, MagnifierPopup, ShapePopup
 from .theme import (
     ACTION_BUTTON_STYLE,
     EDIT_STYLE,
+    MENU_STYLE,
     PILL_STYLE,
     PRIMARY_BUTTON_STYLE,
     SEPARATOR_STYLE,
@@ -160,11 +161,15 @@ class Toolbar(QWidget):
         action_row.addWidget(self._snap_btn)
 
         # Overflow menu for rarely used actions
-        self._overflow_btn = QPushButton("⋯")
+        self._overflow_btn = QPushButton()
+        more_pm = icon("more")
+        self._overflow_btn.setIcon(more_pm)
+        self._overflow_btn.setIconSize(more_pm.size())
         self._overflow_btn.setFixedSize(32, 28)
         self._overflow_btn.setStyleSheet(ACTION_BUTTON_STYLE)
         self._overflow_btn.setToolTip("More actions")
         overflow = QMenu(self._overflow_btn)
+        overflow.setStyleSheet(MENU_STYLE)
         overflow.addAction("Import image…", self.import_image_triggered.emit)
         overflow.addAction("Capture region", self.capture_triggered.emit)
         self._overflow_btn.setMenu(overflow)
@@ -245,7 +250,6 @@ class Toolbar(QWidget):
         props_layout.setSpacing(4)
 
         # Line color + width (stroke group)
-        from .icons import icon
         stroke_icon = QLabel()
         stroke_icon.setPixmap(icon("stroke"))
         stroke_icon.setToolTip("Stroke colour and width")
@@ -324,18 +328,14 @@ class Toolbar(QWidget):
         bottom_row.addStretch()
         main_layout.addLayout(bottom_row)
 
-        # Reserve the properties panel's width so toggling it is jump-free
-        self.layout().activate()
-        self._props_container.setFixedWidth(self._props_widget.sizeHint().width())
-
         # Popups (lazy)
         self._shape_popup: ShapePopup | None = None
         self._emoji_popup: EmojiPopup | None = None
         self._mag_zoom_popup: MagnifierPopup | None = None
         self._current_mag_zoom: float = 2.0
 
-        # The toolbar must not impose a minimum window width — the wrapping
-        # ToolbarScrollArea scrolls horizontally when space runs out.
+        # Reserve nothing: the pill's width follows its content (recomputed
+        # in set_properties_visible), the scroll area handles narrow windows.
         self.setMinimumWidth(0)
 
     # -- tool routing ---------------------------------------------------------
@@ -439,6 +439,11 @@ class Toolbar(QWidget):
     def set_properties_visible(self, visible: bool) -> None:
         self._props_widget.setVisible(visible)
         self._props_sep.setVisible(visible)
+        # Keep the pill exactly as wide as its current content; hidden
+        # widgets don't count towards sizeHint(). The tool buttons are
+        # left-aligned, so nothing shifts when the width changes.
+        self.layout().activate()
+        self.setFixedWidth(self.sizeHint().width())
 
     # -- change handlers -------------------------------------------------------
 

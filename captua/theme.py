@@ -61,6 +61,10 @@ ACTION_BUTTON_STYLE = f"""
     QPushButton:disabled {{
         color: #55555C;
     }}
+    QPushButton::menu-indicator {{
+        image: none;
+        width: 0;
+    }}
 """
 
 PRIMARY_BUTTON_STYLE = f"""
@@ -151,5 +155,32 @@ MENU_STYLE = f"""
     }}
     QMenu::item:selected {{
         background-color: {HOVER_BG};
+    }}
+"""
+
+# Slim horizontal scrollbar for the toolbar scroll area — only appears when
+# the window is narrower than the toolbar.
+TOOLBAR_SCROLLAREA_STYLE = f"""
+    QScrollArea {{
+        background: transparent;
+    }}
+    QScrollBar:horizontal {{
+        background: transparent;
+        height: 6px;
+        margin: 0 12px;
+    }}
+    QScrollBar::handle:horizontal {{
+        background: {PILL_BORDER};
+        border-radius: 3px;
+        min-width: 24px;
+    }}
+    QScrollBar::handle:horizontal:hover {{
+        background: {TEXT_DIM};
+    }}
+    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+        width: 0;
+    }}
+    QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+        background: none;
     }}
 """

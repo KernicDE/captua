@@ -52,7 +52,7 @@ from PySide6.QtWidgets import (
 from .backdrop import BackdropPopup
 from .canvas import CanvasScene, CanvasView, draw_backdrop
 from .settings import apply_to_scene, extract_from_scene, load_settings, save_settings
-from .theme import TOAST_STYLE, WINDOW_BG
+from .theme import TOAST_STYLE, TOOLBAR_SCROLLAREA_STYLE, WINDOW_BG
 from .toolbar import Toolbar
 from .tools import (
     ArrowTool,
@@ -133,12 +133,17 @@ class ToolbarScrollArea(QScrollArea):
         super().__init__(parent)
         self.setWidget(toolbar)
         self.setWidgetResizable(False)
-        self.setFixedHeight(80)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # 80px toolbar + room for a slim scrollbar that appears only when
+        # the window is narrower than the toolbar
+        self.setFixedHeight(88)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setFrameShape(QFrame.Shape.NoFrame)
-        self.setStyleSheet("background: transparent;")
+        self.setStyleSheet(TOOLBAR_SCROLLAREA_STYLE)
         self.setMinimumWidth(0)
+        # Center the pill when it fits; alignment is ignored once it is
+        # wider than the viewport and scrolling kicks in.
+        self.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
 
     def wheelEvent(self, event) -> None:
         self.horizontalScrollBar().setValue(
@@ -545,10 +550,22 @@ class OverlayWindow(QMainWindow):
         if self._scene.base_image() is not None:
             self._resize_for_scene()
             self._fit_image()
+            # Some compositors impose a default height on freshly opened
+            # floating windows (e.g. a niri window-rule with
+            # `default-window-height { proportion 1.0 }`). Re-assert our
+            # computed size once the compositor has had its say.
+            QTimer.singleShot(120, self._reassert_size)
+            QTimer.singleShot(500, self._reassert_size)
         # Grab keyboard focus immediately so modifier keys (e.g. Ctrl for
         # zoom) are recognised without requiring a click into the canvas first.
         self.activateWindow()
         self._view.setFocus(Qt.FocusReason.ActiveWindowFocusReason)
+
+    def _reassert_size(self) -> None:
+        """Re-apply the computed window size (see showEvent note)."""
+        if self._scene.base_image() is not None:
+            self._resize_for_scene()
+            self._fit_image()
 
     def closeEvent(self, event) -> None:
         """Persist all current settings on window close.
