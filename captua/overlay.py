@@ -479,7 +479,7 @@ class OverlayWindow(QMainWindow):
         central layout margins) so it fits without scrolling."""
         _, max_w, max_h = self._screen_constraints()
         content_rect = self._scene.content_rect()
-        toolbar_w = self._toolbar.width() + 20  # 10px central layout margins
+        toolbar_w = self._toolbar.full_width() + 20  # 10px central layout margins
         new_w, new_h = compute_window_size(
             content_rect.width(),
             content_rect.height(),
@@ -495,10 +495,28 @@ class OverlayWindow(QMainWindow):
         pass
 
     def _on_scene_rect_fitted(self, old_rect: QRectF, new_rect: QRectF) -> None:
-        """Scene grew past the image edge (e.g. an annotation drawn outside).
+        """Scene grew past the image edge (annotation drawn outside, image
+        added, ...): grow the window to keep the content visible.
 
-        The window size stays fixed — overflowing content remains reachable
-        via pan/zoom. Only a repaint is needed."""
+        Grow-only — the window never shrinks below its initial fit. The
+        decorative backdrop padding is ignored (content_rect excludes it).
+        Content beyond the available screen space stays reachable via
+        pan/zoom."""
+        _, max_w, max_h = self._screen_constraints()
+        content_rect = self._scene.content_rect()
+        toolbar_w = self._toolbar.full_width() + 20
+        need_w, need_h = compute_window_size(
+            content_rect.width(),
+            content_rect.height(),
+            self._toolbar_scroll.height(),
+            max_w,
+            max_h,
+            toolbar_w=toolbar_w,
+        )
+        new_w = min(max(self.width(), need_w), max_w)
+        new_h = min(max(self.height(), need_h), max_h)
+        if new_w != self.width() or new_h != self.height():
+            self.resize(new_w, new_h)
         self._view.viewport().update()
 
     def set_image(self, pixmap: QPixmap) -> None:
@@ -551,6 +569,7 @@ class OverlayWindow(QMainWindow):
         """
         super().showEvent(event)
         if self._scene.base_image() is not None:
+            self._toolbar.refresh_full_width()
             self._resize_for_scene()
             self._fit_image()
             # Some compositors impose a default height on freshly opened

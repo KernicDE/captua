@@ -129,13 +129,13 @@ Changes are previewed live. Settings persist between sessions.
 | `PgUp` / `PgDn` | Change layer order |
 | `?` | Toggle keyboard-shortcut overlay |
 | `Middle-drag` | Pan the canvas |
-| `Ctrl+Scroll` | Zoom in / out |
+| `Scroll` | Zoom in / out |
 
 ## Tips
 
 - After drawing most annotations, the tool automatically switches back to **Mouse** mode so you can reposition it immediately. Toggle the **pin** button next to the tools to keep the active tool instead (persists between sessions).
 - The **Picker** (`D`) stays active after a click so you can sample multiple colours; switch to another tool when done.
-- The window has a fixed size — the captured content plus a 50 px margin, capped at the available screen space. Content drawn beyond the image edge stays reachable via pan and zoom.
+- The window starts at content + 50px margin (at least as wide as the toolbar) and **grows automatically** when annotations or added images extend the canvas — never beyond the available screen space and never shrinking back. Further overflow stays reachable via pan (middle-drag) and zoom (scroll wheel).
 - Copying is instant: the window closes right away while the image is encoded, saved and handed to the clipboard in the background.
 - Use **Undo** liberally — the full history is kept in memory for the session.
 - The checkerboard pattern behind the canvas is only visible in the editor; it is **not** included in saved or copied images.

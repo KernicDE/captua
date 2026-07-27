@@ -331,16 +331,22 @@ class CanvasView(QGraphicsView):
         return self.mapToScene(event.pos())
 
     def wheelEvent(self, event: QWheelEvent) -> None:
-        """Ctrl+wheel zooms; plain wheel scrolls vertically."""
-        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            delta = event.angleDelta().y()
-            factor = 1.15 if delta > 0 else 1 / 1.15
-            self._zoom *= factor
-            self.scale(factor, factor)
-            self.viewport().update()
-            event.accept()
-        else:
-            super().wheelEvent(event)
+        """Wheel zooms (with or without Ctrl).
+
+        Modifier-only zoom (Ctrl+wheel) is unreliable here: on Wayland the
+        modifier state in wheel events is only tracked when the window has
+        keyboard focus, which a frameless floating overlay may not have
+        received yet. Panning stays available via middle-drag and the
+        (hidden) scrollbars."""
+        delta = event.angleDelta().y()
+        if delta == 0:
+            event.ignore()
+            return
+        factor = 1.15 if delta > 0 else 1 / 1.15
+        self._zoom *= factor
+        self.scale(factor, factor)
+        self.viewport().update()
+        event.accept()
 
     def drawBackground(self, painter: QPainter, rect) -> None:
         # 1. Checkerboard

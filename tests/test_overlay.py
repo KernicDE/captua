@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QEvent, Qt
-from PySide6.QtGui import QColor, QImage, QKeyEvent, QPixmap
+from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+from PySide6.QtGui import QColor, QImage, QKeyEvent, QPixmap, QWheelEvent
 
 import captua.settings as settings_module
 from captua.overlay import OverlayWindow, _deliver_png
@@ -124,3 +124,58 @@ class TestSettingsPersistence:
         assert data["screenshots_folder"] == "/tmp/custom-shots"
         assert data["sticky_tools"] is True
         assert data["update_check_enabled"] is True  # untouched key survives
+
+
+class TestWindowSizing:
+    def test_min_width_fits_full_toolbar(self, qtbot, win, monkeypatch) -> None:
+        # Offscreen screens are tiny (800x600); pretend a real one
+        monkeypatch.setattr(win, "_screen_constraints", lambda: (40, 5000, 5000))
+        win.show()  # showEvent refreshes full_width with final font metrics
+        # Even with a tiny screenshot the window fits the widest pill state
+        # (properties panel visible), so nothing is clipped.
+        expected = win._toolbar.full_width() + 20
+        assert win.width() >= expected
+
+    def test_window_grows_with_content(self, qtbot, win, monkeypatch) -> None:
+        # Offscreen screens are tiny; give the window room to grow into
+        monkeypatch.setattr(win, "_screen_constraints", lambda: (40, 5000, 5000))
+        win.show()
+        initial_w = win.width()
+        pm = QPixmap(3000, 50)
+        pm.fill(QColor("#00FF00"))
+        win._scene.add_image(pm)  # placed at 0,0 — extends content far right
+        assert win.width() > initial_w
+
+    def test_window_never_shrinks(self, qtbot, win) -> None:
+        win.show()
+        initial_w = win.width()
+        initial_h = win.height()
+        # Re-fitting the same content must not shrink the window
+        win._scene._expand_scene_if_needed()
+        assert win.width() >= initial_w
+        assert win.height() >= initial_h
+
+
+class TestZoom:
+    @staticmethod
+    def _wheel(delta: int) -> QWheelEvent:
+        return QWheelEvent(
+            QPointF(100, 100),
+            QPointF(100, 100),
+            QPoint(0, 0),
+            QPoint(0, delta),
+            Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier,
+            Qt.ScrollPhase.NoScrollPhase,
+            False,
+        )
+
+    def test_plain_wheel_zooms_in(self, win) -> None:
+        before = win._view.transform().m11()
+        win._view.wheelEvent(self._wheel(120))
+        assert win._view.transform().m11() > before
+
+    def test_plain_wheel_zooms_out(self, win) -> None:
+        before = win._view.transform().m11()
+        win._view.wheelEvent(self._wheel(-120))
+        assert win._view.transform().m11() < before

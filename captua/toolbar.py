@@ -334,8 +334,11 @@ class Toolbar(QWidget):
         self._mag_zoom_popup: MagnifierPopup | None = None
         self._current_mag_zoom: float = 2.0
 
-        # Reserve nothing: the pill's width follows its content (recomputed
-        # in set_properties_visible), the scroll area handles narrow windows.
+        # Capture the widest state (properties panel visible) before
+        # anything is hidden — the window uses it as its minimum width so
+        # the pill always fits, whatever tool is active.
+        self.layout().activate()
+        self._full_width = self.sizeHint().width()
         self.setMinimumWidth(0)
 
     # -- tool routing ---------------------------------------------------------
@@ -435,6 +438,26 @@ class Toolbar(QWidget):
 
     def active_tool(self) -> str:
         return self._active
+
+    def full_width(self) -> int:
+        """Width of the pill with the properties panel visible (widest state)."""
+        return self._full_width
+
+    def refresh_full_width(self) -> None:
+        """Recompute the widest pill width once the window is shown.
+
+        sizeHint() before the first show is unreliable (font metrics are
+        not final yet), so the overlay calls this from showEvent before
+        sizing the window."""
+        props_visible = self._props_widget.isVisible()
+        self._props_widget.setVisible(True)
+        self._props_sep.setVisible(True)
+        self.layout().activate()
+        self._full_width = self.sizeHint().width()
+        self._props_widget.setVisible(props_visible)
+        self._props_sep.setVisible(props_visible)
+        self.layout().activate()
+        self.setFixedWidth(self.sizeHint().width())
 
     def set_properties_visible(self, visible: bool) -> None:
         self._props_widget.setVisible(visible)
