@@ -3,10 +3,10 @@
 import sys
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QCursor, QFont
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
-from .capture import capture_region, capture_screen
+from .capture import capture_region, capture_screen, screen_at_cursor
 from .overlay import OverlayWindow
 from .settings import load_settings
 
@@ -65,12 +65,11 @@ def main() -> int:
 
     window = OverlayWindow()
 
-    # Open on the screen that currently contains the mouse cursor
-    cursor_pos = QCursor.pos()
-    for screen in app.screens():
-        if screen.geometry().contains(cursor_pos):
-            window.setScreen(screen)
-            break
+    # Open on the screen under the mouse cursor (or the nearest one, for
+    # multi-monitor layouts with gaps between outputs).
+    screen = screen_at_cursor()
+    if screen is not None:
+        window.setScreen(screen)
 
     if pixmap is not None and not pixmap.isNull():
         window.set_image(pixmap)

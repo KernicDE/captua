@@ -6,22 +6,51 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from PySide6.QtGui import QCursor, QPixmap
+from PySide6.QtGui import QCursor, QGuiApplication, QPixmap
 from PySide6.QtWidgets import QApplication
+
+
+def nearest_screen(pos):
+    """Screen whose geometry is closest to pos (0 if pos is inside it).
+
+    Multi-monitor layouts can have gaps between screens (e.g. outputs at
+    different y-offsets, as with a rotated side monitor); if the cursor
+    sits in such a gap, neither geometry().contains() nor
+    QGuiApplication.screenAt() matches any screen. Falling back to the
+    nearest one instead of "no screen" avoids grim defaulting to every
+    connected output combined into one oversized image.
+    """
+    screens = QApplication.screens()
+    if not screens:
+        return None
+
+    def _distance(screen) -> int:
+        rect = screen.geometry()
+        dx = max(rect.left() - pos.x(), 0, pos.x() - rect.right())
+        dy = max(rect.top() - pos.y(), 0, pos.y() - rect.bottom())
+        return dx * dx + dy * dy
+
+    return min(screens, key=_distance)
+
+
+def screen_at_cursor():
+    """Screen under the cursor, falling back to the nearest / primary one."""
+    try:
+        cursor_pos = QCursor.pos()
+        return (
+            QGuiApplication.screenAt(cursor_pos)
+            or nearest_screen(cursor_pos)
+            or QApplication.primaryScreen()
+        )
+    except Exception:
+        return QApplication.primaryScreen()
 
 
 def _set_dpr(pixmap: QPixmap) -> QPixmap:
     """Apply the device-pixel-ratio of the screen under the cursor."""
-    try:
-        cursor_pos = QCursor.pos()
-        for screen in QApplication.screens():
-            if screen.geometry().contains(cursor_pos):
-                pixmap.setDevicePixelRatio(screen.devicePixelRatio())
-                break
-        else:
-            pixmap.setDevicePixelRatio(QApplication.primaryScreen().devicePixelRatio())
-    except Exception:
-        pass
+    screen = screen_at_cursor()
+    if screen is not None:
+        pixmap.setDevicePixelRatio(screen.devicePixelRatio())
     return pixmap
 
 
@@ -64,12 +93,22 @@ def capture_region() -> QPixmap:
 
 
 def capture_screen() -> QPixmap:
-    """Capture the full active screen."""
+    """Capture the full active screen (the one under the cursor).
+
+    Without -o, grim captures every connected output combined into one
+    oversized image spanning the whole virtual desktop.
+    """
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
         tmp_path = tmp.name
 
+    screen = screen_at_cursor()
+    cmd = ["grim", "-c"]
+    if screen is not None:
+        cmd += ["-o", screen.name()]
+    cmd.append(tmp_path)
+
     try:
-        _run(["grim", "-c", tmp_path])
+        _run(cmd)
         return _trim_border(_set_dpr(QPixmap(tmp_path)))
     finally:
         Path(tmp_path).unlink(missing_ok=True)
