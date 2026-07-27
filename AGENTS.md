@@ -61,6 +61,9 @@ tests/              # pytest suite (see Testing)
 scripts/
   install.sh        # End-user installer (distro detection, venv at ~/.local/share/captua, .desktop entry)
   debug.sh          # Dev wrapper: runs `python3 -m captua.main` with repo on PYTHONPATH, logs to /tmp/captua.log
+  make_demo_image.py  # Generates the synthetic mock app window (/tmp/demo-app.png) for README assets
+  record_demo.py    # Scripted overlay demo (timed fake input) for recording docs/screenshots/
+docs/screenshots/   # README assets: captua-demo.gif, captua-overlay.png, captua-annotated.png
 docs/GUIDE.md       # User-facing feature documentation
 docs/superpowers/   # Plans/notes for AI-assisted development
 .github/workflows/release.yml  # Tag-triggered release packaging

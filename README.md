@@ -25,6 +25,14 @@ A fast, lightweight screenshot annotation tool for **Linux / Wayland**.
 - **Backdrop settings** — padding, colors, gradients, corner radius, angle dial
 - **Auto-updater** — checks for new releases on startup and self-updates from the release tarball
 
+## Screenshots
+
+![Captua demo — annotate and copy in seconds](docs/screenshots/captua-demo.gif)
+
+| Fresh capture | Annotated |
+|---|---|
+| ![Overlay right after capture](docs/screenshots/captua-overlay.png) | ![Fully annotated screenshot](docs/screenshots/captua-annotated.png) |
+
 ## Install
 
 ### Quick install (recommended)
