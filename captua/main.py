@@ -101,7 +101,7 @@ def main() -> int:
             print("Usage: captua [--screen | -s | --window | -w]")
             print("  (no args)      Select a region with slurp")
             print("  --screen, -s   Capture the full active screen")
-            print("  --window, -w   Capture the active Hyprland window")
+            print("  --window, -w   Capture the active window")
             return 0
 
     # A new capture replaces any still-open overlay from a previous run

@@ -77,7 +77,10 @@ def _run(cmd: list[str]) -> str:
 
 
 def capture_region() -> QPixmap:
-    """Prompt user to select a region with slurp, capture it with grim."""
+    """Prompt user to select a region and capture it."""
+    if _is_kde():
+        return _capture_region_kde()
+
     geometry = _run(["slurp"])
     if not geometry:
         raise RuntimeError("No region selected")
@@ -98,6 +101,9 @@ def capture_screen() -> QPixmap:
     Without -o, grim captures every connected output combined into one
     oversized image spanning the whole virtual desktop.
     """
+    if _is_kde():
+        return _capture_screen_kde()
+
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
         tmp_path = tmp.name
 
@@ -119,10 +125,50 @@ def _is_niri() -> bool:
     return os.environ.get("XDG_CURRENT_DESKTOP", "").lower() == "niri"
 
 
+def _is_kde() -> bool:
+    """Check whether KDE Plasma (KWin) is the current desktop.
+
+    KWin does not implement the wlr-screencopy protocol grim/slurp rely on,
+    so region/screen/window capture shell out to Spectacle's CLI instead.
+    """
+    return "kde" in os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+
+
+def _spectacle_capture(*flag: str) -> QPixmap:
+    """Run Spectacle in background mode with the given mode flag, load the result."""
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        _run(["spectacle", "-b", "-n", *flag, "-o", tmp_path])
+        if not Path(tmp_path).exists() or Path(tmp_path).stat().st_size == 0:
+            raise RuntimeError("Spectacle did not produce a screenshot")
+        return _set_dpr(QPixmap(tmp_path))
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+
+def _capture_region_kde() -> QPixmap:
+    """Capture an interactively selected region via Spectacle."""
+    return _spectacle_capture("-r")
+
+
+def _capture_screen_kde() -> QPixmap:
+    """Capture the current screen (the one under the cursor) via Spectacle."""
+    return _spectacle_capture("-m")
+
+
+def _capture_window_kde() -> QPixmap:
+    """Capture the active window via Spectacle."""
+    return _spectacle_capture("-a")
+
+
 def capture_window() -> QPixmap:
-    """Capture the currently focused window (Hyprland or Niri)."""
+    """Capture the currently focused window (Hyprland, Niri, or KDE/KWin)."""
     if _is_niri():
         return _capture_window_niri()
+    if _is_kde():
+        return _capture_window_kde()
     return _capture_window_hyprland()
 
 
