@@ -282,6 +282,8 @@ class OverlayWindow(QMainWindow):
         self.copy_finished.connect(self._on_copy_finished)
         self._uploading = False
         self._upload_bar = None
+        self._upload_png = b""
+        self._upload_expiry = ""
         self._uploader = Uploader(self)
         self._uploader.finished.connect(self._on_upload_finished)
         self._uploader.failed.connect(self._on_upload_failed)
@@ -775,10 +777,15 @@ class OverlayWindow(QMainWindow):
         buffer = QBuffer()
         buffer.open(QIODevice.OpenModeFlag.WriteOnly)
         self.render_to_pixmap().toImage().save(buffer, "PNG")
+        self._upload_png = bytes(buffer.data())
+        self._send_upload(PERMANENT if permanent else self._settings.get("upload_expiry", "24h"))
+
+    def _send_upload(self, expiry: str) -> None:
+        self._upload_expiry = expiry
         self._uploading = True
         self._toolbar.set_upload_enabled(False)
         self._show_upload_progress()
-        self._uploader.upload(bytes(buffer.data()), PERMANENT if permanent else self._settings.get("upload_expiry", "24h"))
+        self._uploader.upload(self._upload_png, expiry)
 
     def _show_upload_progress(self) -> None:
         """Centered progress bar; busy (range 0..0) until the first progress report."""
@@ -811,12 +818,22 @@ class OverlayWindow(QMainWindow):
         QApplication.clipboard().setText(link)
         self._show_toast("Link copied")
 
-    def _on_upload_failed(self, message: str) -> None:
+    def _on_upload_failed(self, message: str, server_error: bool = False) -> None:
         self._hide_upload_progress()
         self._uploading = False
         self._toolbar.set_upload_enabled(True)
         self._show_toast("Upload failed")
-        self._dialog(QMessageBox.Icon.Warning, "Upload failed", message)
+        if server_error and self._upload_expiry != PERMANENT:
+            if self._dialog(
+                QMessageBox.Icon.Question,
+                "Upload failed",
+                f"{message}\n\nUpload permanently via catbox.moe instead? Anonymous uploads "
+                "cannot be deleted, and anyone with the link can view the image.",
+                ask=True,
+            ):
+                self._send_upload(PERMANENT)
+        else:
+            self._dialog(QMessageBox.Icon.Warning, "Upload failed", message)
 
     def _deliver_copy(self, image: QImage, save_path: Path | None, use_wl_copy: bool) -> None:
         ok, saved_name = _deliver_png(image, save_path, use_wl_copy)

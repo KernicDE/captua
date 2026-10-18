@@ -23,7 +23,7 @@ class Uploader(QObject):
     """Asynchronous Litterbox upload; one request at a time is the caller's job."""
 
     finished = Signal(str)  # link
-    failed = Signal(str)
+    failed = Signal(str, bool)  # message, server error (5xx)
     progress = Signal(int, int)  # bytes sent, total
 
     def __init__(self, parent=None) -> None:
@@ -60,11 +60,18 @@ class Uploader(QObject):
     def _on_reply(self, reply: QNetworkReply) -> None:
         try:
             if reply.error() != QNetworkReply.NetworkError.NoError:
-                self.failed.emit(reply.errorString())
+                status = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute)
+                server_error = bool(status and status >= 500)
+                self.failed.emit(
+                    f"The upload service is having trouble (HTTP {status}). Try again later."
+                    if server_error
+                    else reply.errorString(),
+                    server_error,
+                )
                 return
             link = parse_link(bytes(reply.readAll().data()).decode("utf-8", "replace"))
             if link is None:
-                self.failed.emit("Unexpected response from the upload service.")
+                self.failed.emit("Unexpected response from the upload service.", False)
             else:
                 self.finished.emit(link)
         finally:

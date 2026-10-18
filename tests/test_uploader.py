@@ -85,3 +85,29 @@ def test_progress_bar_follows_upload(qapp, tmp_path, monkeypatch):
     assert bar.isHidden()
     win._settings["auto_save_on_copy"] = False
     win.close()
+
+
+def test_server_error_offers_permanent_fallback(qapp, tmp_path, monkeypatch):
+    from PySide6.QtGui import QColor, QPixmap
+
+    import captua.settings as settings_module
+    from captua.overlay import OverlayWindow
+
+    monkeypatch.setattr(settings_module, "CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr(settings_module, "CONFIG_FILE", tmp_path / "cfg" / "settings.json")
+    win = OverlayWindow()
+    pm = QPixmap(40, 30)
+    pm.fill(QColor("#336699"))
+    win.set_image(pm)
+    win._settings["upload_consent"] = True
+    sent, answers = [], []
+    monkeypatch.setattr(win._uploader, "upload", lambda png, expiry: sent.append(expiry))
+    monkeypatch.setattr(win, "_dialog", lambda icon, title, text, ask=False: answers.append(ask) or True)
+
+    win.upload_image()
+    win._on_upload_failed("HTTP 500", True)  # asks, user agrees -> permanent retry
+    assert sent == ["24h", "permanent"] and answers == [True]
+    win._on_upload_failed("HTTP 500", True)  # permanent already failed -> plain warning
+    assert sent == ["24h", "permanent"] and answers == [True, False]
+    win._settings["auto_save_on_copy"] = False
+    win.close()
