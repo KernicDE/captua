@@ -24,6 +24,7 @@ class Uploader(QObject):
 
     finished = Signal(str)  # link
     failed = Signal(str)
+    progress = Signal(int, int)  # bytes sent, total
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -53,6 +54,7 @@ class Uploader(QObject):
         req.setTransferTimeout(_TIMEOUT_MS)
         reply = self._nam.post(req, multi)
         multi.setParent(reply)  # keep the parts alive until the reply is gone
+        reply.uploadProgress.connect(self.progress.emit)
         reply.finished.connect(lambda: self._on_reply(reply))
 
     def _on_reply(self, reply: QNetworkReply) -> None:

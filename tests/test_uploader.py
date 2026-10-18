@@ -58,3 +58,30 @@ def test_overlay_upload_flow(qapp, tmp_path, monkeypatch):
     assert QApplication.clipboard().text() == "https://files.catbox.moe/y.png"
     win._settings["auto_save_on_copy"] = False
     win.close()
+
+
+def test_progress_bar_follows_upload(qapp, tmp_path, monkeypatch):
+    from PySide6.QtGui import QColor, QPixmap
+
+    import captua.settings as settings_module
+    from captua.overlay import OverlayWindow
+
+    monkeypatch.setattr(settings_module, "CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr(settings_module, "CONFIG_FILE", tmp_path / "cfg" / "settings.json")
+    win = OverlayWindow()
+    pm = QPixmap(40, 30)
+    pm.fill(QColor("#336699"))
+    win.set_image(pm)
+    win._settings["upload_consent"] = True
+    monkeypatch.setattr(win._uploader, "upload", lambda png, expiry: None)
+    win.upload_image()
+    bar = win._upload_bar
+    assert not bar.isHidden() and bar.maximum() == 0  # busy until the first report
+    win._uploader.progress.emit(50, 200)
+    assert (bar.value(), bar.maximum()) == (50, 200) and "25" in bar.text()
+    win._uploader.progress.emit(200, 200)
+    assert "server" in bar.text()
+    win._on_upload_finished("https://litter.catbox.moe/x.png")
+    assert bar.isHidden()
+    win._settings["auto_save_on_copy"] = False
+    win.close()

@@ -45,6 +45,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QProgressBar,
     QVBoxLayout,
     QWidget,
 )
@@ -56,7 +57,7 @@ from .uploader import PERMANENT, Uploader
 from .settings import apply_to_scene, extract_from_scene, load_settings, save_settings
 from .history import capture_state, push_changes
 from .imageio import load_image_file
-from .theme import DIALOG_STYLE, TOAST_STYLE, WINDOW_BG
+from .theme import DIALOG_STYLE, PROGRESS_STYLE, TOAST_STYLE, WINDOW_BG
 from .toolbar import Toolbar
 from .tools import (
     ArrowTool,
@@ -280,6 +281,7 @@ class OverlayWindow(QMainWindow):
         self._copy_in_progress = False
         self.copy_finished.connect(self._on_copy_finished)
         self._uploading = False
+        self._upload_bar = None
         self._uploader = Uploader(self)
         self._uploader.finished.connect(self._on_upload_finished)
         self._uploader.failed.connect(self._on_upload_failed)
@@ -775,16 +777,42 @@ class OverlayWindow(QMainWindow):
         self.render_to_pixmap().toImage().save(buffer, "PNG")
         self._uploading = True
         self._toolbar.set_upload_enabled(False)
-        self._show_toast("Uploading…", 60_000)
+        self._show_upload_progress()
         self._uploader.upload(bytes(buffer.data()), PERMANENT if permanent else self._settings.get("upload_expiry", "24h"))
 
+    def _show_upload_progress(self) -> None:
+        """Centered progress bar; busy (range 0..0) until the first progress report."""
+        if self._upload_bar is None:
+            self._upload_bar = QProgressBar(self)
+            self._upload_bar.setStyleSheet(PROGRESS_STYLE)
+            self._upload_bar.setFixedWidth(280)
+            self._uploader.progress.connect(self._on_upload_progress)
+        self._upload_bar.setRange(0, 0)
+        self._upload_bar.setFormat("Uploading…")
+        self._upload_bar.move((self.width() - 280) // 2, self.height() - 105)  # above the bottom pills
+        self._upload_bar.raise_()
+        self._upload_bar.show()
+
+    def _on_upload_progress(self, sent: int, total: int) -> None:
+        if self._upload_bar is None or total <= 0:
+            return
+        self._upload_bar.setRange(0, total)
+        self._upload_bar.setValue(sent)
+        self._upload_bar.setFormat("Uploading… %p%" if sent < total else "Waiting for server…")
+
+    def _hide_upload_progress(self) -> None:
+        if self._upload_bar is not None:
+            self._upload_bar.hide()
+
     def _on_upload_finished(self, link: str) -> None:
+        self._hide_upload_progress()
         self._uploading = False
         self._toolbar.set_upload_enabled(True)
         QApplication.clipboard().setText(link)
         self._show_toast("Link copied")
 
     def _on_upload_failed(self, message: str) -> None:
+        self._hide_upload_progress()
         self._uploading = False
         self._toolbar.set_upload_enabled(True)
         self._show_toast("Upload failed")

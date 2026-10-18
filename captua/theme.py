@@ -180,3 +180,9 @@ QMessageBox QPushButton {{ background-color: {HOVER_BG}; color: {TEXT}; border: 
                            border-radius: {RADIUS_BUTTON}px; padding: 5px 16px; min-width: 60px; }}
 QMessageBox QPushButton:hover {{ background-color: {PRESSED_BG}; }}
 """
+
+PROGRESS_STYLE = f"""
+QProgressBar {{ background-color: {PILL_BG}; color: {TEXT}; border: 1px solid {PILL_BORDER};
+                 border-radius: {RADIUS_BUTTON}px; text-align: center; min-height: 22px; }}
+QProgressBar::chunk {{ background-color: {ACCENT}; border-radius: {RADIUS_BUTTON - 1}px; }}
+"""
