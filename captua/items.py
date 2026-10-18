@@ -1331,9 +1331,25 @@ class CanvasImageItem(QGraphicsPixmapItem):
         # and makes every zoom level except 100% look pixelated.
         self.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
         self._corner_radius = corner_radius
-        self._scaled: QPixmap | None = None
+        self._mips: list[QPixmap] = []
         # Images are not movable — only annotations should expand the backdrop
         self.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
+
+    def _mip_level(self, k: int) -> QPixmap:
+        """Pixmap halved k times (area-averaged), built lazily from the previous level."""
+        if not self._mips:
+            self._mips = [self.pixmap()]
+        while len(self._mips) <= k and self._mips[-1].width() > 2 and self._mips[-1].height() > 2:
+            prev = self._mips[-1]
+            self._mips.append(
+                prev.scaled(
+                    max(1, prev.width() // 2),
+                    max(1, prev.height() // 2),
+                    Qt.AspectRatioMode.IgnoreAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+        return self._mips[min(k, len(self._mips) - 1)]
 
     def set_corner_radius(self, radius: float) -> None:
         self._corner_radius = radius
@@ -1347,18 +1363,18 @@ class CanvasImageItem(QGraphicsPixmapItem):
             path = QPainterPath()
             path.addRoundedRect(self.boundingRect(), self._corner_radius, self._corner_radius)
             painter.setClipPath(path)
-        # Zoomed far out, Qt's bilinear sampling skips pixels (aliasing). Draw an
-        # area-averaged copy instead, cached per target size.
+        # Zoomed out, plain bilinear sampling skips pixels (aliasing). Draw from
+        # a mipmap level that is at most 2x larger than the target instead; the
+        # levels are built once, so zooming stays fast.
         pm = self.pixmap()
         dev_scale = painter.worldTransform().m11() * painter.device().devicePixelRatioF()
-        target_w = int(self.boundingRect().width() * dev_scale)
-        if 0 < target_w < pm.width() * 0.7:
-            if self._scaled is None or self._scaled.width() != target_w:
-                self._scaled = pm.scaledToWidth(
-                    target_w, Qt.TransformationMode.SmoothTransformation
-                )
-            painter.drawPixmap(self.boundingRect(), self._scaled, QRectF(self._scaled.rect()))
-            return
+        target_w = self.boundingRect().width() * dev_scale
+        if 0 < target_w < pm.width():
+            level = self._mip_level(int(math.log2(pm.width() / target_w)))
+            if level is not pm:
+                painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+                painter.drawPixmap(self.boundingRect(), level, QRectF(level.rect()))
+                return
         super().paint(painter, option, widget)
 
 
