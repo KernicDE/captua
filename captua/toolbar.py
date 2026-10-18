@@ -81,7 +81,7 @@ class ColorSwatch(QPushButton):
 
     def __init__(self, initial_color: QColor | None = None, parent=None, colors: list[tuple[str, str]] = PRESET_COLORS) -> None:
         super().__init__(parent)
-        self._color = QColor(initial_color) if initial_color is not None else QColor("#FF5D62")
+        self._color = QColor(initial_color) if initial_color is not None else QColor("#F23C3C")
         self._colors = colors
         self._palette: ColorPalettePopup | None = None
         self._hide_timer = QTimer(self)

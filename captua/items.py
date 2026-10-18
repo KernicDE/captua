@@ -74,7 +74,7 @@ class RectangleItem(QGraphicsRectItem):
         self._radius = radius
         self._line_color = QColor(color)
         self._line_width = width
-        self._fill_color = QColor(fill_color) if fill_color is not None else QColor("#FF5D62")
+        self._fill_color = QColor(fill_color) if fill_color is not None else QColor("#F23C3C")
         self._fill_alpha = fill_alpha
         self.setPen(_create_pen(color, width))
         if fill_alpha > 0:
@@ -149,7 +149,7 @@ class EllipseItem(QGraphicsEllipseItem):
         super().__init__(rect, parent)
         self._line_color = QColor(color)
         self._line_width = width
-        self._fill_color = QColor(fill_color) if fill_color is not None else QColor("#FF5D62")
+        self._fill_color = QColor(fill_color) if fill_color is not None else QColor("#F23C3C")
         self._fill_alpha = fill_alpha
         self.setPen(_create_pen(color, width))
         if fill_alpha > 0:
@@ -946,7 +946,7 @@ class MagnifierCalloutItem(QGraphicsItem):
         self._dest_r = dest_radius
         self._pixmap = zoomed_pixmap
         self._zoom_level = zoom_level
-        self._line_color = QColor(line_color) if line_color is not None else QColor("#FF5D62")
+        self._line_color = QColor(line_color) if line_color is not None else QColor("#F23C3C")
         self._line_width = line_width
         self.setFlags(
             QGraphicsItem.GraphicsItemFlag.ItemIsSelectable

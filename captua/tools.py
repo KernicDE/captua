@@ -47,14 +47,14 @@ class ToolProperties:
     """Shared drawing properties."""
 
     def __init__(self) -> None:
-        self.color = QColor("#FF5D62")  # Default red (line color)
+        self.color = QColor("#F23C3C")  # Default red (line color)
         self.stroke_width = 3.0
         self.rounded_radius = 6.0
         self.font_size = 16
         self.counter = 1
         self.shape_type = "heart"
         self.shape_filled = False
-        self.fill_color = QColor("#FF5D62")
+        self.fill_color = QColor("#F23C3C")
         self.fill_alpha = 128
         self.emoji = "😀"
         self.zoom_level = 2.0
@@ -527,8 +527,8 @@ class MagnifierTool(Tool):
     def mouse_press(self, event: QMouseEvent, pos: QPointF) -> None:
         self._center = pos
         self._active_item = QGraphicsEllipseItem(QRectF(0, 0, 0, 0))
-        self._active_item.setPen(QPen(QColor("#FF5D62"), 2))
-        self._active_item.setBrush(QColor("#FF5D62"))
+        self._active_item.setPen(QPen(QColor("#F23C3C"), 2))
+        self._active_item.setBrush(QColor("#F23C3C"))
         self._active_item.setOpacity(0.3)
         self._active_item.setZValue(1)
         self.scene.addItem(self._active_item)

@@ -225,9 +225,9 @@ class OverlayWindow(QMainWindow):
         self._toolbar.set_sticky(self._sticky_tools)
 
         # Apply default tool properties from settings
-        self._props.color = QColor(self._settings.get("line_color", "#FF5D62"))
+        self._props.color = QColor(self._settings.get("line_color", "#F23C3C"))
         self._props.stroke_width = self._settings.get("line_width", 3)
-        self._props.fill_color = QColor(self._settings.get("fill_color", "#FF5D62"))
+        self._props.fill_color = QColor(self._settings.get("fill_color", "#F23C3C"))
         self._props.fill_alpha = self._settings.get("fill_alpha", 128)
         self._toolbar.set_line_color(self._props.color)
         self._toolbar.set_line_width(self._props.stroke_width)

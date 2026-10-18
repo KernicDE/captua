@@ -20,14 +20,16 @@ from .theme import EDIT_STYLE, PILL_BG, PILL_BORDER, TEXT, accent_css
 
 # Fixed annotation colours offered by the hover palette.
 PRESET_COLORS = [
-    ("Red", "#FF5D62"),
-    ("Green", "#4CD97B"),
+    ("Red", "#F23C3C"),
+    ("Orange", "#FF9F0A"),
     ("Yellow", "#FFD60A"),
-    ("Blue", "#4DA3FF"),
-    ("Turquoise", "#2DD4BF"),
+    ("Green", "#2FBF5B"),
+    ("Blue", "#2F7BFF"),
     ("Pink / Purple", "#C86BFA"),
+    ("White", "#FFFFFF"),
+    ("Black", "#111111"),
 ]
-BACKDROP_COLORS = PRESET_COLORS + [("White", "#FFFFFF"), ("Dark", "#1A1A1A")]
+BACKDROP_COLORS = PRESET_COLORS + [("Dark", "#1A1A1A")]
 
 _SHAPE_ICONS = [
     ("heart", "♥"),
