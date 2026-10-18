@@ -10,6 +10,12 @@ def _make_completed(stdout: str, returncode: int = 0) -> subprocess.CompletedPro
     return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr="")
 
 
+@pytest.fixture(autouse=True)
+def _hyprland_env(monkeypatch):
+    """Window-capture tests target the Hyprland path regardless of the host desktop."""
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "Hyprland")
+
+
 class TestCaptureWindow:
     def test_invalid_json_raises_runtime_error(self):
         """hyprctl returning invalid JSON must raise RuntimeError, not JSONDecodeError."""

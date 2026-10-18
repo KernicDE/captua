@@ -45,8 +45,7 @@ echo
 PYTHON_CMD=""
 for cmd in python3.12 python3.11 python3; do
     if command -v "$cmd" &>/dev/null; then
-        ver=$($cmd -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-        if python3 -c "import sys; exit(0 if sys.version_info >= (3,11) else 1)" 2>/dev/null <<<""; then
+        if "$cmd" -c "import sys; sys.exit(0 if sys.version_info >= (3,11) else 1)" 2>/dev/null; then
             PYTHON_CMD="$cmd"
             break
         fi

@@ -37,6 +37,45 @@ class RemoveItemCommand(Command):
             self.scene.addItem(self.item)
 
 
+class CropCommand(Command):
+    """Replace the base image by a cropped one; annotations are removed.
+
+    Undo restores the previous base image and every removed item."""
+
+    def __init__(self, scene, old_pixmap, cropped_pixmap, removed_items) -> None:
+        self.scene = scene
+        self.old_pixmap = old_pixmap
+        self.cropped_pixmap = cropped_pixmap
+        self.removed = list(removed_items)
+        self._images = list(scene._image_items)
+
+    def _show(self, pixmap) -> None:
+        # The overlay window also resizes itself and refits the view.
+        for view in self.scene.views():
+            win = view.window()
+            if hasattr(win, "set_image"):
+                win.set_image(pixmap)
+                return
+        self.scene.set_base_image(pixmap)
+
+    def do(self) -> None:
+        self.scene.clearSelection()
+        for item in self.removed:
+            if item.scene() is self.scene:
+                self.scene.removeItem(item)
+        self.scene._image_items.clear()
+        self._show(self.cropped_pixmap)
+
+    def undo(self) -> None:
+        self.scene.clearSelection()
+        self._show(self.old_pixmap)
+        for item in self.removed:
+            if item.scene() is None:
+                self.scene.addItem(item)
+        self.scene._image_items[:] = self._images
+        self.scene._expand_scene_if_needed()
+
+
 class History:
     """Keeps undo/redo stacks."""
 

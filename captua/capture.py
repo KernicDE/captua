@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 from PySide6.QtGui import QCursor, QGuiApplication, QPixmap
@@ -65,13 +66,23 @@ def _trim_border(pixmap: QPixmap) -> QPixmap:
 _TIMEOUT = 15
 
 
-def _run(cmd: list[str]) -> str:
-    """Run a command and return stdout, raising on error."""
+class CaptureCancelled(RuntimeError):
+    """The user aborted an interactive selection (Esc)."""
+
+
+def _run(cmd: list[str], interactive: bool = False) -> str:
+    """Run a command and return stdout, raising on error.
+
+    Interactive commands (region selection) wait for the user, so they get
+    no timeout."""
+    timeout = None if interactive else _TIMEOUT
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_TIMEOUT)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError(f"Command timed out after {_TIMEOUT}s: {' '.join(cmd)}") from exc
     if result.returncode != 0:
+        if interactive and "cancel" in result.stderr.lower():
+            raise CaptureCancelled("Selection cancelled")
         raise RuntimeError(f"Command failed: {' '.join(cmd)}\n{result.stderr}")
     return result.stdout.strip()
 
@@ -81,7 +92,7 @@ def capture_region() -> QPixmap:
     if _is_kde():
         return _capture_region_kde()
 
-    geometry = _run(["slurp"])
+    geometry = _run(["slurp"], interactive=True)
     if not geometry:
         raise RuntimeError("No region selected")
 
@@ -140,7 +151,7 @@ def _spectacle_capture(*flag: str) -> QPixmap:
         tmp_path = tmp.name
 
     try:
-        _run(["spectacle", "-b", "-n", *flag, "-o", tmp_path])
+        _run(["spectacle", "-b", "-n", *flag, "-o", tmp_path], interactive="-r" in flag)
         if not Path(tmp_path).exists() or Path(tmp_path).stat().st_size == 0:
             raise RuntimeError("Spectacle did not produce a screenshot")
         return _set_dpr(QPixmap(tmp_path))
@@ -199,7 +210,6 @@ def _capture_window_niri() -> QPixmap:
         if candidates:
             new_path = max(candidates, key=lambda p: p.stat().st_mtime)
             break
-        import time
         time.sleep(0.05)
 
     if new_path is None:

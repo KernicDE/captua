@@ -8,7 +8,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, UnidentifiedImageErro
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPen, QPixmap, QTextCursor
 
-from .history import AddItemCommand
+from .history import AddItemCommand, CropCommand
 from .items import (
     ArrowItem,
     BlurItem,
@@ -37,6 +37,10 @@ def _shift_held(event: QMouseEvent) -> bool:
 def _snap_pos(scene, pos: QPointF, exclude_item=None) -> QPointF:
     from .canvas import snap_point
     return snap_point(scene, pos, exclude_item)
+
+
+# Pixelation block size (px) of the blur/redaction tool
+_REDACT_BLOCK = 10
 
 
 class ToolProperties:
@@ -111,38 +115,29 @@ class CropTool(Tool):
             crop_rect = self._active_item.crop_rect.normalized()
             self.scene.removeItem(self._active_item)
             self._active_item = None
+            # A stray click must not wipe the canvas
+            if crop_rect.width() < 8 or crop_rect.height() < 8:
+                return
             base = self.scene.base_image()
             if base is not None:
                 pixmap = base.pixmap()
                 dpr = pixmap.devicePixelRatio()
-                # Crop in logical coordinates, copy handles DPR
+                # QPixmap.copy works in device pixels, the rect is logical
                 cropped = pixmap.copy(
-                    int(crop_rect.x()),
-                    int(crop_rect.y()),
-                    max(1, int(crop_rect.width())),
-                    max(1, int(crop_rect.height())),
+                    int(crop_rect.x() * dpr),
+                    int(crop_rect.y() * dpr),
+                    max(1, int(crop_rect.width() * dpr)),
+                    max(1, int(crop_rect.height() * dpr)),
                 )
                 if not cropped.isNull():
                     cropped.setDevicePixelRatio(dpr)
-                    # Remove all annotations and clear history
-                    for item in list(self.scene.items()):
-                        if item is not base:
-                            self.scene.removeItem(item)
-                    if self.history is not None:
-                        self.history.clear()
-                    # Replace base image
-                    self.scene.set_base_image(cropped)
-                    # Resize window via overlay
-                    win = None
+                    removed = [i for i in self.scene.items() if i is not base]
+                    self.history.push(CropCommand(self.scene, pixmap, cropped, removed))
+                    # Exit crop mode: show toolbar and switch to select
                     for view in self.scene.views():
-                        win = view.window()
+                        if hasattr(view.window(), "set_crop_mode"):
+                            view.window().set_crop_mode(False)
                         break
-                    if win is not None and hasattr(win, "set_image"):
-                        win.set_image(cropped)
-                        win._fit_image()
-                        # Exit crop mode: show toolbar and switch to select
-                        if hasattr(win, "set_crop_mode"):
-                            win.set_crop_mode(False)
 
 
 class RectangleTool(Tool):
@@ -499,13 +494,19 @@ class BlurTool(Tool):
             buf.close()
 
             pil_img = Image.open(BytesIO(bytes(ba))).convert("RGBA")
-            pil_img = pil_img.filter(ImageFilter.GaussianBlur(radius=25))
+            # Redaction: a Gaussian blur alone can be partly reversed, so average
+            # the pixels into blocks first (information is gone), then smooth.
+            block = _REDACT_BLOCK
+            small = pil_img.resize((max(1, w // block), max(1, h // block)), Image.Resampling.BOX)
+            pil_img = small.resize((w, h), Image.Resampling.NEAREST)
+            pil_img = pil_img.filter(ImageFilter.GaussianBlur(radius=block / 2))
 
-            # Feather mask: white over original selection, fading to black in padding
-            mask = Image.new("L", (w, h), 0)
-            draw = ImageDraw.Draw(mask)
+            # Mask: fully opaque over the selection (no original shines through),
+            # feathered only outward into the padding
+            sel = Image.new("L", (w, h), 0)
+            draw = ImageDraw.Draw(sel)
             draw.rectangle([pad, pad, pad + rw, pad + rh], fill=255)
-            mask = mask.filter(ImageFilter.GaussianBlur(radius=pad))
+            mask = ImageChops.lighter(sel, sel.filter(ImageFilter.GaussianBlur(radius=pad)))
 
             r, g, b, a = pil_img.split()
             a = ImageChops.multiply(a, mask)
@@ -526,8 +527,8 @@ class MagnifierTool(Tool):
     def mouse_press(self, event: QMouseEvent, pos: QPointF) -> None:
         self._center = pos
         self._active_item = QGraphicsEllipseItem(QRectF(0, 0, 0, 0))
-        self._active_item.setPen(QPen(QColor("#A07050"), 2))
-        self._active_item.setBrush(QColor("#A07050"))
+        self._active_item.setPen(QPen(QColor("#FF5D62"), 2))
+        self._active_item.setBrush(QColor("#FF5D62"))
         self._active_item.setOpacity(0.3)
         self._active_item.setZValue(1)
         self.scene.addItem(self._active_item)

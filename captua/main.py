@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
-from .capture import capture_region, capture_screen, screen_at_cursor
+from .capture import CaptureCancelled, capture_region, capture_screen, screen_at_cursor
 from .overlay import OverlayWindow
 from .settings import load_settings
 
@@ -76,7 +76,10 @@ def main() -> int:
     app.setApplicationName("captua-overlay")
     app.setApplicationDisplayName("Captua")
     app.setDesktopFileName("captua-overlay")
-    app.setFont(QFont("Inter", 10))
+    font = QFont()
+    font.setFamilies(["Inter", "Noto Sans", "DejaVu Sans"])
+    font.setPointSize(10)
+    app.setFont(font)
 
     # Global tooltip style — bright text on dark background so tooltips are readable
     app.setStyleSheet("""
@@ -115,8 +118,14 @@ def main() -> int:
             pixmap = capture_window()
         else:
             pixmap = capture_screen()
+    except CaptureCancelled:
+        return 0
     except RuntimeError as exc:
         print(f"Capture failed: {exc}", file=sys.stderr)
+        return 1
+
+    if pixmap is None or pixmap.isNull():
+        print("Capture failed: no image was captured", file=sys.stderr)
         return 1
 
     window = OverlayWindow()
@@ -127,8 +136,7 @@ def main() -> int:
     if screen is not None:
         window.setScreen(screen)
 
-    if pixmap is not None and not pixmap.isNull():
-        window.set_image(pixmap)
+    window.set_image(pixmap)
 
     window.show()
 
@@ -144,7 +152,11 @@ def main() -> int:
             if skipped == version:
                 return
             dialog = UpdateDialog(version, changelog, url)
-            dialog.skipped.connect(lambda v: save_settings({**settings, "skipped_version": v}))
+            # Keep a reference: a parentless widget is destroyed once GC'd
+            app._update_dialog = dialog
+            dialog.skipped.connect(
+                lambda v: save_settings({**load_settings(), "skipped_version": v})
+            )
             dialog.show()
 
         checker = UpdateChecker(__version__)

@@ -107,7 +107,7 @@ class ShapePopup(QWidget):
             }
             QPushButton:checked {
                 background-color: #5C3A2E;
-                border: 1px solid #A07050;
+                border: 1px solid #FF5D62;
             }
         """)
         self.setFixedSize(200, 200)
@@ -190,7 +190,7 @@ class EmojiPopup(QWidget):
             }
             QListView::item:selected {
                 background-color: #5C3A2E;
-                border: 1px solid #A07050;
+                border: 1px solid #FF5D62;
                 border-radius: 4px;
             }
         """)
@@ -249,14 +249,14 @@ class MagnifierPopup(QWidget):
                 border-radius: 2px;
             }
             QSlider::handle:horizontal {
-                background: #A07050;
+                background: #FF5D62;
                 width: 14px;
                 height: 14px;
                 border-radius: 7px;
                 margin: -5px 0;
             }
             QSlider::sub-page:horizontal {
-                background: #A07050;
+                background: #FF5D62;
                 border-radius: 2px;
             }
         """)

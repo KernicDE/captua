@@ -35,7 +35,8 @@ class SelfUpdater(QObject):
         if exit_code != 0:
             out = self._proc.readAllStandardError().data().decode("utf-8", "replace").strip()
             # If the error looks like a permission issue, try --user as a fallback
-            if "Permission denied" in out or "permission denied" in out.lower():
+            in_venv = sys.prefix != sys.base_prefix
+            if not in_venv and "permission denied" in out.lower():
                 self._try_user_install()
                 return
             self.finished.emit(

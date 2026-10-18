@@ -1,6 +1,7 @@
 """Check for updates from GitHub releases."""
 
 import json
+import re
 
 from PySide6.QtCore import QObject, QUrl, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
@@ -43,8 +44,8 @@ class UpdateChecker(QObject):
         body = data.get("body", "")
         url = data.get("html_url", "")
 
-        if not tag:
-            self.error.emit("No version found in release data.")
+        if not re.fullmatch(r"\d+(\.\d+)*", tag):
+            self.error.emit("No valid version found in release data.")
             return
 
         if self._is_newer(tag, self._current):

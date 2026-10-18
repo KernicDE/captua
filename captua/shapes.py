@@ -51,7 +51,7 @@ _BTN_STYLE = _DIALOG_STYLE + """
     }
     QPushButton:checked {
         background-color: #5C3A2E;
-        border: 1px solid #A07050;
+        border: 1px solid #FF5D62;
     }
 """
 

@@ -1,6 +1,7 @@
 """Persistent JSON settings for Captua."""
 
 import json
+import os
 from pathlib import Path
 
 from PySide6.QtGui import QColor
@@ -44,6 +45,8 @@ def load_settings() -> dict:
             data = json.load(f)
     except (json.JSONDecodeError, OSError):
         return defaults
+    if not isinstance(data, dict):
+        return defaults
 
     # Merge with defaults so new keys are always present
     merged = {**defaults, **data}
@@ -53,10 +56,13 @@ def load_settings() -> dict:
 def save_settings(data: dict) -> None:
     """Write settings to disk atomically, creating directories if necessary."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    tmp_file = CONFIG_DIR / ".settings.tmp"
-    with open(tmp_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-    tmp_file.replace(CONFIG_FILE)
+    tmp_file = CONFIG_DIR / f".settings.{os.getpid()}.tmp"
+    try:
+        with open(tmp_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        tmp_file.replace(CONFIG_FILE)
+    finally:
+        tmp_file.unlink(missing_ok=True)
 
 
 def apply_to_scene(scene, settings: dict) -> None:

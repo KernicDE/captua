@@ -75,7 +75,7 @@ class UpdateDialog(QWidget):
         self._progress.setStyleSheet(
             "QProgressBar { background-color: #1A1A1A; border: 1px solid #2A2A2A; "
             "border-radius: 4px; height: 6px; }"
-            "QProgressBar::chunk { background-color: #A07050; border-radius: 4px; }"
+            "QProgressBar::chunk { background-color: #FF5D62; border-radius: 4px; }"
         )
         self._progress.hide()
         layout.addWidget(self._progress)
@@ -92,10 +92,10 @@ class UpdateDialog(QWidget):
         self._update_btn = QPushButton("Update Now")
         self._update_btn.setFixedHeight(36)
         self._update_btn.setStyleSheet(
-            "QPushButton { background-color: #A07050; color: #0A0A0A; "
+            "QPushButton { background-color: #FF5D62; color: #101014; "
             "border: none; border-radius: 10px; font-weight: bold; font-size: 13px; padding: 0 16px; }"
-            "QPushButton:hover { background-color: #9ABAE8; }"
-            "QPushButton:pressed { background-color: #5A7FB8; }"
+            "QPushButton:hover { background-color: #FF7074; }"
+            "QPushButton:pressed { background-color: #E14A4F; }"
         )
         self._update_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._update_btn.clicked.connect(self._on_self_update)
@@ -136,7 +136,7 @@ class UpdateDialog(QWidget):
         self._status.show()
         self._status.setText("Checking for updates…")
 
-        self._updater = SelfUpdater(self)
+        self._updater = SelfUpdater(self._version, self)
         self._updater.progress.connect(self._status.setText)
         self._updater.finished.connect(self._on_updater_finished)
         self._updater.start()

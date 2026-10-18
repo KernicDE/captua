@@ -4,6 +4,7 @@ import math
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (
+    QBrush,
     QColor,
     QDragEnterEvent,
     QDropEvent,
@@ -13,6 +14,7 @@ from PySide6.QtGui import (
     QMouseEvent,
     QPainter,
     QPen,
+    QPixmap,
     QWheelEvent,
 )
 from PySide6.QtWidgets import (
@@ -263,10 +265,18 @@ class CanvasView(QGraphicsView):
 
     def __init__(self, scene: CanvasScene, parent=None) -> None:
         super().__init__(scene, parent)
-        self._zoom = 1.0
         self._panning = False
         self._pan_start = None
         self._active_tool = None
+
+        # 40x40 tile = 2x2 checker cells of 20 px, painted once
+        tile = QPixmap(40, 40)
+        tile.fill(QColor("#0A0A0A"))
+        tp = QPainter(tile)
+        tp.fillRect(0, 0, 20, 20, QColor("#1A1A1A"))
+        tp.fillRect(20, 20, 20, 20, QColor("#1A1A1A"))
+        tp.end()
+        self._checker_brush = QBrush(tile)
 
         # Resize handle state (active in SelectTool mode)
         self._resize_item = None
@@ -343,22 +353,17 @@ class CanvasView(QGraphicsView):
             event.ignore()
             return
         factor = 1.15 if delta > 0 else 1 / 1.15
-        self._zoom *= factor
+        new_zoom = self.transform().m11() * factor
+        if not 0.05 <= new_zoom <= 32:
+            event.accept()
+            return
         self.scale(factor, factor)
         self.viewport().update()
         event.accept()
 
     def drawBackground(self, painter: QPainter, rect) -> None:
         # 1. Checkerboard
-        cell = 20
-        c1 = QColor("#1A1A1A")
-        c2 = QColor("#0A0A0A")
-        x_start = int(rect.left()) // cell * cell
-        y_start = int(rect.top()) // cell * cell
-        for y in range(y_start, int(rect.bottom()) + cell, cell):
-            for x in range(x_start, int(rect.right()) + cell, cell):
-                color = c1 if ((x // cell) + (y // cell)) % 2 == 0 else c2
-                painter.fillRect(x, y, cell, cell, color)
+        painter.fillRect(rect, self._checker_brush)
 
         # 2. Backdrop behind all content
         scene = self.scene()
@@ -484,7 +489,7 @@ class CanvasView(QGraphicsView):
         handle_size = max(8 / scale, 2)
         pen_width = max(1 / scale, 0.5)
         # White handle with accent border for better contrast
-        painter.setPen(QPen(QColor("#A07050"), pen_width))
+        painter.setPen(QPen(QColor("#FF5D62"), pen_width))
         painter.setBrush(QColor("#E8E8E8"))
         for item in self.scene().selectedItems():
             if not self._item_supports_resize(item):
@@ -507,7 +512,7 @@ class CanvasView(QGraphicsView):
             if not isinstance(item, MagnifierCalloutItem):
                 continue
             dest = item.mapToScene(item._dest_c)
-            painter.setPen(QPen(QColor("#A07050"), pen_width))
+            painter.setPen(QPen(QColor("#FF5D62"), pen_width))
             painter.setBrush(QColor("#E8E8E8"))
             painter.drawRect(
                 dest.x() - handle_size / 2,
@@ -523,6 +528,7 @@ class CanvasView(QGraphicsView):
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
             event.accept()
             return
+        self._hide_hint()
         if event.button() == Qt.MouseButton.LeftButton and self._tool_handles_mouse():
             self._active_tool.mouse_press(event, self._scene_pos(event))
             event.accept()
@@ -664,9 +670,11 @@ class CanvasView(QGraphicsView):
     def _show_shortcut_overlay(self) -> None:
         """Show a semi-transparent overlay with keyboard shortcuts."""
         if self._shortcut_overlay is not None:
+            was_hint = getattr(self._shortcut_overlay, "_is_hint", False)
             self._shortcut_overlay.deleteLater()
             self._shortcut_overlay = None
-            return
+            if not was_hint:
+                return
 
         overlay = QLabel(self.viewport())
         overlay.setStyleSheet(
@@ -839,7 +847,7 @@ class CanvasView(QGraphicsView):
                 self._hint_shown = True
                 hint = QLabel(self.viewport())
                 hint.setStyleSheet(
-                    "color: #5A5A5A; font-size: 14px; background: transparent;"
+                    "color: #9A9AA2; font-size: 14px; background: transparent;"
                 )
                 hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 hint.setText("Click a tool to annotate  ·  Ctrl+C to copy & save")

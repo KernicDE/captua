@@ -30,6 +30,7 @@ def compute_window_size(
     return w, h
 
 import shutil
+import sys
 import subprocess
 import threading
 from datetime import datetime
@@ -345,7 +346,7 @@ class OverlayWindow(QMainWindow):
     def _capture_region(self) -> None:
         """Capture a new region and add it to the canvas."""
         try:
-            from .capture import capture_region
+            from .capture import CaptureCancelled, capture_region
             pixmap = capture_region()
             if pixmap is not None and not pixmap.isNull():
                 try:
@@ -356,8 +357,12 @@ class OverlayWindow(QMainWindow):
                 center = self._view.mapToScene(self._view.viewport().rect().center())
                 pos = center - QPointF(pixmap.width() / 2, pixmap.height() / 2)
                 self._scene.add_image(pixmap, pos)
-        except RuntimeError:
-            pass  # User cancelled or capture failed
+        except CaptureCancelled:
+            return
+        except RuntimeError as exc:
+            # slurp/Spectacle report a cancelled selection as a failed command
+            self._show_toast("Capture cancelled or failed", 2500)
+            print(f"Capture failed: {exc}", file=sys.stderr)
 
     def _import_image(self) -> None:
         """Open a file dialog to import an image onto the canvas."""
@@ -595,13 +600,22 @@ class OverlayWindow(QMainWindow):
         Merges over the loaded settings so keys managed elsewhere
         (screenshots folder/template, update check, skipped version,
         auto-save toggle) are not wiped on every close."""
+        if self._copy_in_progress:
+            # Closing now would kill the delivery thread before wl-copy has the data
+            event.ignore()
+            return
+        # "Skip version" is saved by the update dialog while the window is open
         stored = {**self._settings, **extract_from_scene(self._scene)}
+        stored["skipped_version"] = load_settings().get("skipped_version", "")
         stored["line_color"] = self._props.color.name()
         stored["line_width"] = self._props.stroke_width
         stored["fill_color"] = self._props.fill_color.name()
         stored["fill_alpha"] = self._props.fill_alpha
         stored["sticky_tools"] = self._sticky_tools
-        save_settings(stored)
+        try:
+            save_settings(stored)
+        except OSError as exc:
+            print(f"Could not save settings: {exc}", file=sys.stderr)
         super().closeEvent(event)
 
     def resizeEvent(self, event) -> None:
@@ -667,7 +681,13 @@ class OverlayWindow(QMainWindow):
         ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         template = self._settings.get("screenshot_filename_template", "captua-{timestamp}.png")
         filename = template.replace("{timestamp}", ts).replace("{date}", datetime.now().strftime("%Y-%m-%d"))
-        return folder / filename
+        filename = Path(filename).name or f"captua-{ts}.png"  # no ../ or absolute paths
+        path = folder / filename
+        n = 2
+        while path.exists():
+            path = folder / f"{Path(filename).stem}-{n}{Path(filename).suffix}"
+            n += 1
+        return path
 
     def _show_toast(self, message: str, duration_ms: int = 1500) -> None:
         """Show a transient status label centered in the window."""
@@ -724,7 +744,9 @@ class OverlayWindow(QMainWindow):
             QMessageBox.critical(
                 self,
                 "Save Failed",
-                "Could not auto-save the screenshot. Please use Save As (Ctrl+S) instead.",
+                "Could not auto-save the screenshot to "
+                f"{self._settings.get('screenshots_folder', '~/Pictures/Screenshots')}.\n"
+                "Check the folder permissions or use Save As (Ctrl+S) instead.",
             )
             return
         # Closing right away is the feedback that the copy succeeded; wl-copy

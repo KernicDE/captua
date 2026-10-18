@@ -4,7 +4,7 @@
 
 Captua is a fast, lightweight screenshot annotation tool (a Shottr clone) for **Linux / Wayland only**, written in Python with PySide6 (Qt6). It captures a region, screen, or window, opens it in a frameless overlay window with a `QGraphicsScene` canvas, and lets the user annotate, then copy or save the result.
 
-- Current version: **0.6.0** (kept in sync in `captua/__init__.py` and `pyproject.toml`)
+- Current version: **0.6.1** (kept in sync in `captua/__init__.py` and `pyproject.toml`)
 - Entry point: console script `captua = captua.main:main`
 - CLI modes: `captua` (region, default), `captua --screen|-s`, `captua --window|-w`, `captua --help|-h`
 - Repository: https://github.com/KernicDE/captua
@@ -18,6 +18,7 @@ Captua is a fast, lightweight screenshot annotation tool (a Shottr clone) for **
   - `slurp` — region selection
   - `wl-clipboard` (`wl-copy`) — clipboard integration
   - `hyprctl` (Hyprland) or `niri` (Niri) — window capture
+  - `spectacle` (KDE/KWin) — region/screen/window capture (KWin has no wlr-screencopy)
 - Dev dependencies (extra `dev`): `pytest`, `pytest-qt`
 
 ## Project Structure

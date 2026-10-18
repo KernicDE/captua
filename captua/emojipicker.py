@@ -74,7 +74,7 @@ _DIALOG_STYLE = """
         font-size: 16px;
     }
     QLineEdit:focus {
-        border: 1px solid #A07050;
+        border: 1px solid #FF5D62;
     }
     QPushButton {
         background-color: #2A2A37;

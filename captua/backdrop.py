@@ -47,8 +47,8 @@ _POPUP_STYLE = """
         background: #0A0A0A;
     }
     QCheckBox::indicator:checked {
-        background: #A07050;
-        border-color: #A07050;
+        background: #FF5D62;
+        border-color: #FF5D62;
     }
     QSlider::groove:horizontal {
         height: 4px;
@@ -56,14 +56,14 @@ _POPUP_STYLE = """
         border-radius: 2px;
     }
     QSlider::handle:horizontal {
-        background: #A07050;
+        background: #FF5D62;
         width: 14px;
         height: 14px;
         border-radius: 7px;
         margin: -5px 0;
     }
     QSlider::sub-page:horizontal {
-        background: #A07050;
+        background: #FF5D62;
         border-radius: 2px;
     }
 """
@@ -101,7 +101,7 @@ class _AngleDial(QWidget):
         ey = cy - math.sin(angle_rad) * (radius - 2)
         painter.drawLine(QPointF(cx, cy), QPointF(ex, ey))
         # Small dot at the tip
-        painter.setBrush(QColor("#A07050"))
+        painter.setBrush(QColor("#FF5D62"))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(QPointF(ex, ey), 3, 3)
         painter.end()

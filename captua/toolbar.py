@@ -64,6 +64,7 @@ class ToolButton(QPushButton):
         self.setStyleSheet(TOOL_BUTTON_STYLE)
         tooltip = f"{name} ({shortcut})" if shortcut else name
         self.setToolTip(tooltip)
+        self.setAccessibleName(name)
         self._update_icon()
 
     def _update_icon(self) -> None:
@@ -84,18 +85,23 @@ class ColorSwatch(QPushButton):
     def __init__(self, initial_color: QColor | None = None, parent=None) -> None:
         super().__init__(parent)
         self._color = QColor(initial_color) if initial_color is not None else QColor("#FF5D62")
-        self.setFixedSize(24, 24)
+        self.setFixedSize(28, 28)
         self._update_style()
-        self.setToolTip("Click to pick a colour")
+        self.setAccessibleName("Colour")
+        self._update_tooltip()
         self.clicked.connect(self._open_wheel)
 
+    def _update_tooltip(self) -> None:
+        self.setToolTip(f"Colour {self._color.name().upper()} - click to change")
+
     def _update_style(self) -> None:
+        self._update_tooltip()
         c = self._color.name()
         self.setStyleSheet(f"""
             QPushButton {{
                 background-color: {c};
-                border: 2px solid #5A5A5A;
-                border-radius: 12px;
+                border: 2px solid #8A8A92;
+                border-radius: 14px;
             }}
             QPushButton:hover {{
                 border: 2px solid {TEXT};
@@ -336,6 +342,7 @@ class Toolbar(QWidget):
         btn.setFixedSize(28, 28)
         btn.setStyleSheet(ACTION_BUTTON_STYLE)
         btn.setToolTip(tooltip)
+        btn.setAccessibleName(tooltip)
         return btn
 
     def _compute_full_width(self) -> int:

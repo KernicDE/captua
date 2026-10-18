@@ -3,7 +3,7 @@
 # Palette — single accent (the brand red used for annotations).
 WINDOW_BG = "#101014"
 PILL_BG = "#1A1A1F"
-PILL_BORDER = "#2C2C33"
+PILL_BORDER = "#3A3A44"  # >= 1.6:1 against PILL_BG so pills stay visible on bright screenshots
 HOVER_BG = "#26262C"
 PRESSED_BG = "#30303A"
 TEXT = "#E8E8E8"
@@ -35,6 +35,9 @@ TOOL_BUTTON_STYLE = f"""
         border: 1px solid {ACCENT};
         color: {TEXT};
     }}
+    QPushButton:focus {{
+        border: 1px solid {TEXT};
+    }}
 """
 
 ACTION_BUTTON_STYLE = f"""
@@ -58,8 +61,11 @@ ACTION_BUTTON_STYLE = f"""
         color: {TEXT};
         border: 1px solid {ACCENT};
     }}
+    QPushButton:focus {{
+        border: 1px solid {TEXT};
+    }}
     QPushButton:disabled {{
-        color: #55555C;
+        color: #75757D;
     }}
     QPushButton::menu-indicator {{
         image: none;
@@ -70,7 +76,7 @@ ACTION_BUTTON_STYLE = f"""
 PRIMARY_BUTTON_STYLE = f"""
     QPushButton {{
         background-color: {ACCENT};
-        color: #FFFFFF;
+        color: #101014;
         border: none;
         border-radius: {RADIUS_BUTTON}px;
         font-size: 13px;
@@ -83,9 +89,12 @@ PRIMARY_BUTTON_STYLE = f"""
     QPushButton:pressed {{
         background-color: {ACCENT_PRESSED};
     }}
+    QPushButton:focus {{
+        border: 2px solid {TEXT};
+    }}
     QPushButton:disabled {{
-        background-color: #6E3A3D;
-        color: #C8A0A2;
+        background-color: #4A2A2C;
+        color: #B08A8C;
     }}
 """
 

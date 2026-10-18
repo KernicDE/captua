@@ -170,7 +170,7 @@ _EDIT_STYLE = """
         font-size: 12px;
     }
     QLineEdit:focus {
-        border: 1px solid #A07050;
+        border: 1px solid #FF5D62;
     }
 """
 
@@ -184,7 +184,7 @@ _SPIN_STYLE = """
         font-size: 12px;
     }
     QSpinBox:focus {
-        border: 1px solid #A07050;
+        border: 1px solid #FF5D62;
     }
     QSpinBox::up-button, QSpinBox::down-button {
         width: 0px;
