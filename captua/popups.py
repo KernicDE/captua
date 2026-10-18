@@ -1,20 +1,33 @@
 """Popup selectors for shapes, emojis, and magnifier zoom."""
 
-from PySide6.QtCore import QPoint, QSize, Qt, Signal
-from PySide6.QtGui import QFont
+import unicodedata
+
+from PySide6.QtCore import QPoint, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QFont, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QFrame,
-    QGridLayout,
-    QLabel,
+    QHBoxLayout,
+    QLineEdit,
     QListView,
     QPushButton,
-    QSlider,
+    QTabBar,
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtGui import QStandardItem, QStandardItemModel
 
 from .items import _emoji_font_family
+from .theme import EDIT_STYLE, PILL_BG, PILL_BORDER, TEXT, accent_css
+
+# Fixed annotation colours offered by the hover palette.
+PRESET_COLORS = [
+    ("Red", "#FF5D62"),
+    ("Green", "#4CD97B"),
+    ("Yellow", "#FFD60A"),
+    ("Blue", "#4DA3FF"),
+    ("Turquoise", "#2DD4BF"),
+    ("Pink / Purple", "#C86BFA"),
+]
+BACKDROP_COLORS = PRESET_COLORS + [("White", "#FFFFFF"), ("Dark", "#1A1A1A")]
 
 _SHAPE_ICONS = [
     ("heart", "♥"),
@@ -33,30 +46,30 @@ _EMOJIS = (
     "🤐 🤨 😐 😑 😶 😏 😒 🙄 😬 🤥 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🤧 🥵 🥶 🥴 😵 🤯 🤠 🥳 😎 🤓 🧐 "
     "😕 😟 🙁 ☹️ 😮 😯 😲 😳 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 👿 💀 "
     "☠️ 💩 🤡 👹 👺 👻 👽 👾 🤖 😺 😸 😹 😻 😼 😽 🙀 😿 😾"
-    " 👍 👎 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👋 🤚 🖐️ ✋ 🖖 👏 🙌 👐 🤲 🙏 ✍️ 💅 🤳 💪 "
+    "|👍 👎 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👋 🤚 🖐️ ✋ 🖖 👏 🙌 👐 🤲 🙏 ✍️ 💅 🤳 💪 "
     "👂 👃 🧠 👀 👁️ 👅 👄 🫦 👶 🧒 👦 👧 🧑 👱 👨 👩 🧓 👴 👵"
-    " 🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🐤 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🐛 🦋 "
+    "|🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🐤 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🐛 🦋 "
     "🐌 🐞 🐜 🦟 🦗 🕷️ 🦂 🐢 🐍 🦎 🦖 🦕 🐙 🦑 🦐 🦞 🦀 🐡 🐠 🐟 🐬 🐳 🐋 🦈 🐊 🐅 🐆 🦓 🦍 🦧 "
     "🐘 🦛 🦏 🐪 🐫 🦒 🦘 🐃 🐂 🐄 🐎 🐖 🐏 🐑 🦙 🐐 🦌 🐕 🐩 🦮 🐕‍🦺 🐈 🐈‍⬛ 🐓 🦃 🦚 🦜 🦢 🦩 🕊️ "
     "🐇 🦝 🦨 🦡 🦦 🦥 🐁 🐀 🐿️ 🦔"
-    " 🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍈 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🍆 🥑 🥦 🥬 🥒 🌶️ 🫑 🌽 🥕 🫒 🧄 🧅 "
+    "|🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍈 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🍆 🥑 🥦 🥬 🥒 🌶️ 🫑 🌽 🥕 🫒 🧄 🧅 "
     "🥔 🍠 🥐 🥯 🍞 🥖 🥨 🧀 🥚 🍳 🧈 🥞 🧇 🥓 🥩 🍗 🍖 🦴 🌭 🍔 🍟 🍕 🫓 🥪 🥙 🧆 🌮 🌯 🫔 🥗 "
     "🥘 🫕 🥫 🍝 🍜 🍲 🍛 🍣 🍱 🥟 🦪 🍤 🍙 🍚 🍘 🍥 🥠 🥮 🍢 🍡 🍧 🍨 🍦 🥧 🧁 🍰 🎂 🍮 🍭 🍬 "
     "🍫 🍿 🍩 🍪 🌰 🥜 🍯 🥛 🍼 🫖 ☕ 🍵 🧃 🥤 🧋 🍶 🍺 🍻 🥂 🍷 🥃 🍸 🍹 🧉 🍾 🧊"
-    " ⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🥏 🎱 🏓 🏸 🏒 🏑 🥍 🏏 🥅 ⛳ 🏹 🎣 🤿 🥊 🥋 🎽 🛹 🛼 🛷 ⛸️ 🥌 🎿 "
+    "|⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🥏 🎱 🏓 🏸 🏒 🏑 🥍 🏏 🥅 ⛳ 🏹 🎣 🤿 🥊 🥋 🎽 🛹 🛼 🛷 ⛸️ 🥌 🎿 "
     "⛷️ 🏂 🪂 🏋️ 🤼 🤸 ⛹️ 🤺 🤾 🏌️ 🏇 🧘 🏄 🏊 🤽 🚣 🧗 🚵 🚴 🏆 🥇 🥈 🥉 🏅 🎖️ 🏵️ 🎗️ 🎫 🎟️ 🎪 "
     "🤹 🎭 🩰 🎨 🎬 🎤 🎧 🎼 🎹 🥁 🪘 🎷 🎺 🪗 🎸 🪕 🎻 🎲 ♟️ 🎯 🎳 🎮 🎰 🧩"
-    " 🚗 🚕 🚙 🚌 🚎 🏎️ 🚓 🚑 🚒 🚐 🛻 🚚 🚛 🚜 🦯 🦽 🦼 🛴 🚲 🛵 🏍️ 🛺 🚨 🚔 🚍 🚘 🚖 🚡 🚠 "
+    "|🚗 🚕 🚙 🚌 🚎 🏎️ 🚓 🚑 🚒 🚐 🛻 🚚 🚛 🚜 🦯 🦽 🦼 🛴 🚲 🛵 🏍️ 🛺 🚨 🚔 🚍 🚘 🚖 🚡 🚠 "
     "🚟 🚃 🚋 🚞 🚝 🚄 🚅 🚈 🚂 🚆 🚇 🚊 🚉 ✈️ 🛫 🛬 🛩️ 💺 🛰️ 🚀 🛸 🚁 🛶 ⛵ 🚤 🛥️ 🛳️ ⛴️ 🚢 ⚓ "
     "⛽ 🚧 🚦 🚥 🚏 🗺️ 🗿 🗽 🗼 🏰 🏯 🏟️ 🎡 🎢 🎠 ⛲ ⛱️ 🏖️ 🏝️ 🏜️ 🌋 ⛰️ 🏔️ 🗻 🏕️ ⛺ 🏠 🏡 🏘️ "
     "🏚️ 🏗️ 🏭 🏢 🏬 🏣 🏤 🏥 🏦 🏨 🏪 🏫 🏩 💒 🏛️ ⛪ 🕌 🕍 🛕 🕋 ⛩️ 🛤️ 🛣️ 🗾 🎑 🏞️ 🌅 🌄 🌠 "
     "🎇 🎆 🌇 🌆 🏙️ 🌃 🌌 🌉 🌁"
-    " 💻 ⌨️ 🖥️ 🖨️ 🖱️ 🖲️ 🕹️ 💽 💾 💿 📀 📼 📷 📸 📹 🎥 📽️ 🎞️ 📞 ☎️ 📟 📠 📺 📻 🎙️ 🎚️ 🎛️ 🧭 "
+    "|💻 ⌨️ 🖥️ 🖨️ 🖱️ 🖲️ 🕹️ 💽 💾 💿 📀 📼 📷 📸 📹 🎥 📽️ 🎞️ 📞 ☎️ 📟 📠 📺 📻 🎙️ 🎚️ 🎛️ 🧭 "
     "⏱️ ⏲️ ⏰ 🕰️ ⌛ ⏳ 📡 🔋 🔌 💡 🔦 🕯️ 🪔 🧯 🛢️ 💸 💵 💴 💶 💷 🪙 💰 💳 💎 ⚖️ 🧰 🔧 🛠️ 🔨 "
     "⚒️ 🪓 ⛏️ ⚔️ 🔪 🗡️ ⚙️ 🪚 🔩 ⚗️ 🧪 🧫 🧬 🔬 🔭 📡 💉 🩸 💊 🩹 🩺 🌡️ 🚽 🚰 🚿 🛁 🛀 🪥 🪠 "
     "🪤 🪒 🧴 🧷 🧹 🧺 🧻 🪣 🧼 🫧 🧽 🧯 🛒 🚬 ⚰️ 🪦 ⚱️ 🗿 🪧 🏧 🚮 🚰 ♿ 🚹 🚺 🚻 🚼 🚾 🛂 "
     "🛃 🛄 🛅"
-    " ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ☮️ ✝️ ☪️ 🕉️ ☸️ ✡️ 🔯 🕎 ☯️ ☦️ 🛐 "
+    "|❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ☮️ ✝️ ☪️ 🕉️ ☸️ ✡️ 🔯 🕎 ☯️ ☦️ 🛐 "
     "⛎ ♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ 🆔 ⚛️ 🉑 ☢️ ☣️ 📴 📳 🈶 🈚 🈸 🈺 🈷️ ✴️ 🆚 💮 🉐 ㊙️ ㊗️ 🈴 "
     "🈵 🈹 🈲 🅰️ 🅱️ 🆎 🆑 🅾️ 🆘 ❌ ⭕ 🛑 ⛔ 📛 🚫 💯 💢 ♨️ 🚷 🚯 🚳 🚱 🔞 📵 🚭 ❗ ❕ ❓ ❔ ‼️ ⁉️ "
     "🔅 🔆 〽️ ⚠️ 🚸 🔱 ⚜️ 🔰 ♻️ ✅ 🈯 💹 ❇️ ✳️ ❎ 🌐 💠 ➿ ♾️ Ⓜ️ 🏧 🈂️ 🛂 🛃 🛄 🛅 ♿ 🚹 🚺 🚻 "
@@ -65,7 +78,7 @@ _EMOJIS = (
     "⚛️ 🕉️ ✡️ ☸️ ☯️ ✝️ ☦️ ☪️ ☮️ 🕎 🔯 ♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ ⛎ 🔀 🔁 🔂 ▶️ ⏩ ⏭️ ⏯️ ◀️ ⏪ "
     "⏮️ 🔼 ⏫ 🔽 ⏬ ⏸️ ⏹️ ⏺️ ⏏️ 🎦 🔅 🔆 📶 📳 📴 ♀️ ♂️ ⚧️ ✖️ ➕ ➖ ➗ ♾️ ‼️ ⁉️ ❓ ❔ ❕ ❗ 〰️ 💱 💲 "
     "⚕️ ♻️ ❇️ ✳️ ❎ ✅ ☑️ ✔️ ❌ ⭕ 〽️ ✴️ ©️ ®️ ™️"
-    " 🏳️ 🏴 🏴‍☠️ 🏁 🚩 🏳️‍🌈 🏳️‍⚧️ 🇺🇳 🇦🇫 🇦🇽 🇦🇱 🇩🇿 🇦🇸 🇦🇩 🇦🇴 🇦🇮 🇦🇶 🇦🇬 🇦🇷 🇦🇲 🇦🇼 🇦🇺 🇦🇹 🇦🇿 🇧🇸 🇧🇭 🇧🇩 "
+    "|🏳️ 🏴 🏴‍☠️ 🏁 🚩 🏳️‍🌈 🏳️‍⚧️ 🇺🇳 🇦🇫 🇦🇽 🇦🇱 🇩🇿 🇦🇸 🇦🇩 🇦🇴 🇦🇮 🇦🇶 🇦🇬 🇦🇷 🇦🇲 🇦🇼 🇦🇺 🇦🇹 🇦🇿 🇧🇸 🇧🇭 🇧🇩 "
     "🇧🇧 🇧🇾 🇧🇪 🇧🇿 🇧🇯 🇧🇲 🇧🇹 🇧🇴 🇧🇦 🇧🇼 🇧🇷 🇧🇳 🇧🇬 🇧🇷 🇧🇫 🇧🇮 🇰🇭 🇨🇲 🇨🇦 🇨🇻 🇧🇶 🇰🇾 🇨🇫 🇹🇩 🇨🇱 🇨🇳 🇨🇴 🇰🇲 "
     "🇨🇬 🇨🇩 🇨🇰 🇨🇷 🇨🇮 🇭🇷 🇨🇺 🇨🇼 🇨🇾 🇨🇿 🇩🇰 🇩🇯 🇩🇲 🇩🇴 🇪🇨 🇪🇬 🇸🇻 🇬🇶 🇪🇷 🇪🇪 🇪🇹 🇪🇺 🇫🇰 🇫🇴 🇫🇯 🇫🇮 🇫🇷 "
     "🇬🇦 🇬🇲 🇬🇪 🇩🇪 🇬🇭 🇬🇮 🇬🇷 🇬🇱 🇬🇩 🇬🇵 🇬🇺 🇬🇹 🇬🇬 🇬🇳 🇬🇼 🇬🇾 🇭🇹 🇭🇳 🇭🇰 🇭🇺 🇮🇸 🇮🇳 🇮🇩 🇮🇷 🇮🇶 🇮🇪 🇮🇱 🇮🇲 "
@@ -76,23 +89,94 @@ _EMOJIS = (
     "🇹🇹 🇹🇳 🇹🇷 🇹🇲 🇹🇨 🇹🇻 🇻🇮 🇺🇬 🇺🇦 🇦🇪 🇬🇧 🇺🇳 🇺🇸 🇺🇾 🇺🇿 🇻🇺 🇻🇦 🇻🇪 🇻🇳 🇪🇭 🇾🇪 🇿🇲 🇿🇼"
 )
 
-_ALL_EMOJIS = [e for e in _EMOJIS.replace("\n", " ").split(" ") if e]
+
+# Emoji categories, in the order of the groups in _EMOJIS ("|" separates them).
+_CATEGORIES = [
+    ("😀", "Smileys"), ("👍", "People"), ("🐶", "Animals"), ("🍎", "Food"),
+    ("⚽", "Activities"), ("🚗", "Travel"), ("💡", "Objects"), ("❤️", "Symbols"), ("🏳️", "Flags"),
+]
+_EMOJI_GROUPS = [list(dict.fromkeys(g.split())) for g in _EMOJIS.split("|")]
+
+
+def _emoji_name(emoji: str) -> str:
+    """Searchable text: Unicode names, flags as their two-letter code."""
+    words = []
+    for c in emoji:
+        if 0x1F1E6 <= ord(c) <= 0x1F1FF:  # regional indicator -> letter
+            words.append(chr(ord(c) - 0x1F1E6 + ord("a")))
+        elif c not in "\ufe0f\u200d":
+            words.append(unicodedata.name(c, "").lower())
+    return "".join(words) if all(len(w) == 1 for w in words) else " ".join(words)
+
+
+def _show_above(popup: QWidget, widget: QWidget) -> None:
+    """Place a popup directly above `widget` (below it if there is no room)."""
+    pos = widget.mapToGlobal(QPoint(0, -popup.height() - 4))
+    screen = widget.screen()
+    if screen is not None:
+        geo = screen.availableGeometry()
+        pos.setX(max(geo.left(), min(pos.x(), geo.right() - popup.width())))
+        if pos.y() < geo.top():
+            pos.setY(widget.mapToGlobal(QPoint(0, widget.height() + 4)).y())
+    popup.move(pos)
+    popup.show()
+
+
+_POPUP_SURFACE = """
+    QWidget { background-color: #1A1A1A; border: 1px solid #2A2A2A; border-radius: 10px; }
+"""
+
+
+class ColorPalettePopup(QFrame):
+    """Row of fixed colours shown above a swatch while the mouse is over it.
+
+    A plain child of the overlay (not a Qt.Popup) so hovering keeps working."""
+
+    color_picked = Signal(QColor)
+    hover_changed = Signal(bool)
+
+    def __init__(self, parent: QWidget, colors: list[tuple[str, str]]) -> None:
+        super().__init__(parent)
+        self.setObjectName("colorPalette")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet(
+            f"#colorPalette {{ background-color: {PILL_BG}; border: 1px solid {PILL_BORDER}; border-radius: 14px; }}"
+        )
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(6)
+        self._buttons: list[QPushButton] = []
+        for name, hex_ in colors:
+            btn = QPushButton()
+            btn.setFixedSize(24, 24)
+            btn.setToolTip(name)
+            btn.setAccessibleName(name)
+            btn.setStyleSheet(
+                f"QPushButton {{ background-color: {hex_}; border: 2px solid transparent; border-radius: 12px; }}"
+                f"QPushButton:hover, QPushButton:focus {{ border: 2px solid {TEXT}; }}"
+            )
+            btn.clicked.connect(lambda _c=False, h=hex_: self.color_picked.emit(QColor(h)))
+            layout.addWidget(btn)
+            self._buttons.append(btn)
+        self.adjustSize()
+        self.hide()
+
+    def enterEvent(self, event) -> None:
+        self.hover_changed.emit(True)
+
+    def leaveEvent(self, event) -> None:
+        self.hover_changed.emit(False)
 
 
 class ShapePopup(QWidget):
-    """Popup shape selector that appears below a toolbar button."""
+    """Horizontal shape bar that appears above the shape button."""
 
     shape_selected = Signal(str)
 
     def __init__(self, current_shape: str = "heart", parent=None) -> None:
         super().__init__(parent, Qt.WindowType.Popup)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #1A1A1A;
-                border: 1px solid #2A2A2A;
-                border-radius: 10px;
-            }
+        self.setStyleSheet(accent_css(_POPUP_SURFACE + """
             QPushButton {
                 background-color: #2A2A2A;
                 color: #E8E8E8;
@@ -109,56 +193,78 @@ class ShapePopup(QWidget):
                 background-color: #5C3A2E;
                 border: 1px solid #FF5D62;
             }
-        """)
-        self.setFixedSize(200, 200)
-
-        layout = QGridLayout(self)
+        """))
+        layout = QHBoxLayout(self)
         layout.setSpacing(6)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(10, 8, 10, 8)
 
-        for i, (key, icon) in enumerate(_SHAPE_ICONS):
+        self._buttons: dict[str, QPushButton] = {}
+        for key, icon in _SHAPE_ICONS:
             btn = QPushButton(icon)
-            btn.setFixedSize(52, 44)
+            btn.setFixedSize(44, 40)
             btn.setCheckable(True)
             btn.setChecked(key == current_shape)
             btn.clicked.connect(lambda _checked, k=key: self._select(k))
-            layout.addWidget(btn, i // 3, i % 3)
+            layout.addWidget(btn)
+            self._buttons[key] = btn
+        self.setFixedSize(self.sizeHint())
 
     def _select(self, key: str) -> None:
+        for k, btn in self._buttons.items():
+            btn.setChecked(k == key)
         self.shape_selected.emit(key)
         self.close()
 
-    def show_below(self, widget: QWidget) -> None:
-        pos = widget.mapToGlobal(QPoint(0, widget.height() + 4))
-        self.move(pos)
-        self.show()
+    def show_above(self, widget: QWidget) -> None:
+        _show_above(self, widget)
 
 
 class EmojiPopup(QWidget):
-    """Popup emoji selector that appears below a toolbar button."""
+    """Emoji picker above its toolbar button: category tabs plus search."""
 
     emoji_selected = Signal(str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent, Qt.WindowType.Popup)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(400, 360)
+        self.setFixedSize(400, 380)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(0)
 
         container = QFrame(self)
-        container.setStyleSheet("""
+        container.setStyleSheet(accent_css("""
             QFrame {
                 background-color: #1A1A1A;
                 border: 1px solid #2A2A2A;
                 border-radius: 10px;
             }
-        """)
+        """))
         inner = QVBoxLayout(container)
         inner.setContentsMargins(10, 10, 10, 10)
         inner.setSpacing(6)
+
+        self._search = QLineEdit()
+        self._search.setPlaceholderText("Search…")
+        self._search.setStyleSheet(EDIT_STYLE)
+        self._search.textChanged.connect(self._refresh)
+        inner.addWidget(self._search)
+
+        self._tabs = QTabBar()
+        self._tabs.setDrawBase(False)
+        self._tabs.setExpanding(True)
+        self._tabs.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._tabs.setFont(QFont(_emoji_font_family(), 13))
+        self._tabs.setStyleSheet(accent_css("""
+            QTabBar::tab { background: transparent; border: none; border-bottom: 2px solid transparent; padding: 3px 4px; }
+            QTabBar::tab:hover { background: #303030; border-radius: 4px; }
+            QTabBar::tab:selected { border-bottom: 2px solid #FF5D62; }
+        """))
+        for icon, name in _CATEGORIES:
+            self._tabs.setTabText(self._tabs.addTab(icon), icon)
+            self._tabs.setTabToolTip(self._tabs.count() - 1, name)
+        self._tabs.currentChanged.connect(self._refresh)
+        inner.addWidget(self._tabs)
 
         self._view = QListView()
         self._view.setViewMode(QListView.ViewMode.IconMode)
@@ -171,126 +277,40 @@ class EmojiPopup(QWidget):
         self._view.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
         self._view.setSelectionMode(QListView.SelectionMode.SingleSelection)
         self._view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._view.setFont(QFont(_emoji_font_family(), 20))
+        self._view.setStyleSheet(accent_css("""
+            QListView { background-color: transparent; border: none; }
+            QListView::item { background-color: transparent; color: #E8E8E8; }
+            QListView::item:hover { background-color: #303030; border-radius: 4px; }
+            QListView::item:selected { background-color: #5C3A2E; border: 1px solid #FF5D62; border-radius: 4px; }
+        """))
+        self._model = QStandardItemModel(self)
+        self._view.setModel(self._model)
+        self._view.clicked.connect(self._on_clicked)
+        inner.addWidget(self._view)
+        outer.addWidget(container)
+        self._refresh()
 
-        font = QFont(_emoji_font_family(), 20)
-        self._view.setFont(font)
-
-        self._view.setStyleSheet("""
-            QListView {
-                background-color: transparent;
-                border: none;
-            }
-            QListView::item {
-                background-color: transparent;
-                color: #E8E8E8;
-            }
-            QListView::item:hover {
-                background-color: #303030;
-                border-radius: 4px;
-            }
-            QListView::item:selected {
-                background-color: #5C3A2E;
-                border: 1px solid #FF5D62;
-                border-radius: 4px;
-            }
-        """)
-
-        model = QStandardItemModel(self)
-        for emoji in _ALL_EMOJIS:
+    def _refresh(self, *_) -> None:
+        query = self._search.text().lower().split()
+        if query:  # search spans all categories and hides the tab selection
+            pool = dict.fromkeys(e for g in _EMOJI_GROUPS for e in g)
+            names = {e: _emoji_name(e).split() for e in pool}
+            emojis = [e for e in pool if all(any(w.startswith(q) for w in names[e]) for q in query)]
+        else:
+            emojis = _EMOJI_GROUPS[max(0, self._tabs.currentIndex())]
+        self._model.clear()
+        for emoji in emojis:
             item = QStandardItem(emoji)
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             item.setEditable(False)
-            model.appendRow(item)
-
-        self._view.setModel(model)
-        self._view.clicked.connect(self._on_clicked)
-
-        inner.addWidget(self._view)
-        outer.addWidget(container)
+            self._model.appendRow(item)
 
     def _on_clicked(self, index) -> None:
-        emoji = index.data(Qt.ItemDataRole.DisplayRole)
-        self.emoji_selected.emit(emoji)
+        self.emoji_selected.emit(index.data(Qt.ItemDataRole.DisplayRole))
         self.close()
 
-    def show_below(self, widget: QWidget) -> None:
-        pos = widget.mapToGlobal(QPoint(0, widget.height() + 4))
-        screen = widget.screen()
-        if screen is not None:
-            geo = screen.availableGeometry()
-            if pos.x() + self.width() > geo.right():
-                pos.setX(geo.right() - self.width() - 4)
-        self.move(pos)
-        self.show()
-
-
-class MagnifierPopup(QWidget):
-    """Popup zoom slider that appears below the magnifier toolbar button."""
-
-    zoom_changed = Signal(float)
-
-    def __init__(self, current_zoom: float = 2.0, parent=None) -> None:
-        super().__init__(parent, Qt.WindowType.Popup | Qt.WindowType.WindowDoesNotAcceptFocus)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(180, 80)
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #1A1A1A;
-                border: 1px solid #2A2A2A;
-                border-radius: 10px;
-            }
-            QLabel {
-                color: #E8E8E8;
-                font-size: 12px;
-            }
-            QSlider::groove:horizontal {
-                height: 4px;
-                background: #2A2A2A;
-                border-radius: 2px;
-            }
-            QSlider::handle:horizontal {
-                background: #FF5D62;
-                width: 14px;
-                height: 14px;
-                border-radius: 7px;
-                margin: -5px 0;
-            }
-            QSlider::sub-page:horizontal {
-                background: #FF5D62;
-                border-radius: 2px;
-            }
-        """)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(4)
-
-        self._label = QLabel(f"Zoom: {current_zoom:.1f}x")
-        layout.addWidget(self._label)
-
-        self._slider = QSlider(Qt.Orientation.Horizontal)
-        self._slider.setRange(15, 50)  # 1.5x to 5.0x
-        self._slider.setValue(int(current_zoom * 10))
-        self._slider.valueChanged.connect(self._on_value_changed)
-        layout.addWidget(self._slider)
-
-    def _on_value_changed(self, value: int) -> None:
-        zoom = value / 10.0
-        self._label.setText(f"Zoom: {zoom:.1f}x")
-        self.zoom_changed.emit(zoom)
-
-    def set_zoom(self, zoom: float) -> None:
-        self._slider.blockSignals(True)
-        self._slider.setValue(int(round(zoom * 10)))
-        self._slider.blockSignals(False)
-        self._label.setText(f"Zoom: {zoom:.1f}x")
-
-    def show_below(self, widget: QWidget) -> None:
-        pos = widget.mapToGlobal(QPoint(0, widget.height() + 4))
-        screen = widget.screen()
-        if screen is not None:
-            geo = screen.availableGeometry()
-            if pos.x() + self.width() > geo.right():
-                pos.setX(geo.right() - self.width() - 4)
-        self.move(pos)
-        self.show()
+    def show_above(self, widget: QWidget) -> None:
+        self._search.clear()
+        _show_above(self, widget)
+        self._search.setFocus()

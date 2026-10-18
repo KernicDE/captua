@@ -265,10 +265,11 @@ class OverlayWindow(QMainWindow):
         tool = self._tools.get(name)
         self._view.set_active_tool(tool)
         self._toolbar.update_active_tool_button(name)
-        # Show/hide properties based on whether the tool needs them
-        self._toolbar.set_properties_visible(
-            name not in ("select", "crop", "counter", "magnifier", "eyedropper", "emoji", "shape")
-        )
+        self._toolbar.set_zoom_visible(name == "magnifier" or self._selected_has_zoom())
+
+    def _selected_has_zoom(self) -> bool:
+        items = [i for i in self._scene.selectedItems() if i is not self._scene.base_image()]
+        return len(items) == 1 and hasattr(items[0], "zoom_level")
 
     def _update_line_color(self, color) -> None:
         self._props.color = color
@@ -304,10 +305,8 @@ class OverlayWindow(QMainWindow):
 
     def _on_selection_changed(self) -> None:
         items = [i for i in self._scene.selectedItems() if i is not self._scene.base_image()]
+        self._toolbar.set_zoom_visible(self._toolbar.active_tool() == "magnifier" or self._selected_has_zoom())
         if len(items) != 1:
-            self._toolbar.set_properties_visible(
-                self._toolbar.active_tool() not in ("select", "crop", "counter", "magnifier", "eyedropper", "emoji", "shape")
-            )
             return
         item = items[0]
         if hasattr(item, "line_color"):
@@ -325,7 +324,6 @@ class OverlayWindow(QMainWindow):
         if hasattr(item, "zoom_level"):
             self._toolbar.set_magnifier_zoom(item.zoom_level())
             self._props.zoom_level = item.zoom_level()
-        self._toolbar.set_properties_visible(True)
 
     def _update_shape(self, shape_type: str) -> None:
         self._props.shape_type = shape_type
@@ -476,6 +474,9 @@ class OverlayWindow(QMainWindow):
         tb.pill_tools.move(m, yb)
         px = max(m + tb.pill_tools.width() + gap, self.width() - m - tb.pill_props.width())
         tb.pill_props.move(px, yb)
+        # Properties stay visible whenever they fit beside the tools
+        fits = px + tb.pill_props.width() + m <= self.width()
+        tb.pill_props.setVisible(fits and tb.pill_tools.isVisible())
         vl = self._version_label
         vl.move(self.width() - vl.width() - 8, self.height() - vl.height())
         vl.raise_()

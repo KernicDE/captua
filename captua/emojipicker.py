@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from .theme import accent_css
 
 _EMOJIS = (
     "😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😙 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🤫 🤔 "
@@ -61,7 +62,7 @@ _EMOJIS = (
     "🇹🇹 🇹🇳 🇹🇷 🇹🇲 🇹🇨 🇹🇻 🇻🇮 🇺🇬 🇺🇦 🇦🇪 🇬🇧 🇺🇳 🇺🇸 🇺🇾 🇺🇿 🇻🇺 🇻🇦 🇻🇪 🇻🇳 🇪🇭 🇾🇪 🇿🇲 🇿🇼"
 )
 
-_DIALOG_STYLE = """
+_DIALOG_STYLE = accent_css("""
     QDialog {
         background-color: #16161D;
     }
@@ -97,7 +98,7 @@ _DIALOG_STYLE = """
         border: none;
         background-color: transparent;
     }
-"""
+""")
 
 
 class EmojiPickerDialog(QDialog):

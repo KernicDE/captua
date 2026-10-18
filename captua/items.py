@@ -17,6 +17,7 @@ from PySide6.QtGui import (
     QPolygonF,
 )
 from PySide6.QtCore import QObject, QTimer
+from .theme import ACCENT
 
 _EMOJI_FONT_FAMILY: str | None = None
 
@@ -137,7 +138,7 @@ class RectangleItem(QGraphicsRectItem):
         else:
             painter.drawRect(self.rect())
         if self.isSelected():
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             painter.drawRect(self.rect().adjusted(-2, -2, 2, 2))
 
 
@@ -209,7 +210,7 @@ class EllipseItem(QGraphicsEllipseItem):
         painter.setBrush(self.brush())
         painter.drawEllipse(self.rect())
         if self.isSelected():
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             painter.drawRect(self.rect().adjusted(-2, -2, 2, 2))
 
 
@@ -254,7 +255,7 @@ class LineItem(QGraphicsLineItem):
         painter.setPen(self.pen())
         painter.drawLine(self.line())
         if self.isSelected():
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             painter.drawEllipse(self.line().p1(), 4, 4)
             painter.drawEllipse(self.line().p2(), 4, 4)
 
@@ -335,7 +336,7 @@ class ArrowItem(QGraphicsItem):
         painter.drawPolygon(arrow)
 
         if self.isSelected():
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             painter.drawEllipse(self._p1, 4, 4)
             painter.drawEllipse(self._p2, 4, 4)
 
@@ -407,7 +408,7 @@ class PenItem(QGraphicsItem):
             for i in range(len(self._points) - 1):
                 painter.drawLine(self._points[i], self._points[i + 1])
         if self.isSelected():
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             for p in self._points:
                 painter.drawEllipse(p, 3, 3)
 
@@ -490,7 +491,7 @@ class MarkerItem(QGraphicsItem):
         painter.fillPath(stroke_path, self._fill_color)
 
         if self.isSelected():
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             for p in self._points:
                 painter.drawEllipse(p, 3, 3)
 
@@ -527,7 +528,7 @@ class TextItem(QGraphicsTextItem):
     def paint(self, painter: QPainter, option, widget=None) -> None:
         super().paint(painter, option, widget)
         if self.isSelected() or (self.hasFocus() and self.toPlainText() == ""):
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             painter.drawRect(self.boundingRect().adjusted(-2, -2, 2, 2))
 
     def focusOutEvent(self, event: QFocusEvent) -> None:
@@ -601,7 +602,7 @@ class LabelItem(QGraphicsTextItem):
         super().paint(painter, option, widget)
 
         if self.isSelected() or (self.hasFocus() and self.toPlainText() == ""):
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             painter.drawRoundedRect(bg_rect.adjusted(-2, -2, 2, 2), self._radius, self._radius)
 
     def focusOutEvent(self, event: QFocusEvent) -> None:
@@ -663,7 +664,7 @@ class CounterItem(QGraphicsItem):
         th = fm.height()
         painter.drawText(int(-tw / 2), int(th / 2 - fm.descent()), text)
         if self.isSelected():
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             painter.drawEllipse(QPointF(0, 0), self._radius + 2, self._radius + 2)
 
 
@@ -750,7 +751,7 @@ class RulerItem(QGraphicsItem):
         painter.drawText(int(mid.x() - tw / 2), int(mid.y() + th / 2 - fm.descent()), text)
 
         if self.isSelected():
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             painter.drawEllipse(self._p1, 4, 4)
             painter.drawEllipse(self._p2, 4, 4)
 
@@ -861,7 +862,7 @@ class SpotlightItem(QGraphicsItem):
         right_w = max(0.0, ox + ow - right_x)
         painter.drawRect(right_x, left_y, right_w, left_h)
         if self.isSelected():
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRect(self._spotlight.adjusted(-2, -2, 2, 2))
 
@@ -893,7 +894,7 @@ class BlurItem(QGraphicsItem):
     def paint(self, painter: QPainter, option, widget=None) -> None:
         painter.drawPixmap(self._rect.topLeft() + self._offset, self._pixmap)
         if self.isSelected():
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             painter.drawRect(self._rect.adjusted(-2, -2, 2, 2))
 
 
@@ -987,6 +988,17 @@ class MagnifierCalloutItem(QGraphicsItem):
         self._dest_r = self._src_r * zoom
         self._update_pixmap()
 
+    def set_src_radius(self, radius: float, rebuild: bool = True) -> None:
+        """Resize the source circle; the lens keeps its zoom factor.
+        rebuild=False skips the (costly) pixmap re-capture while dragging."""
+        self.prepareGeometryChange()
+        self._src_r = max(8.0, radius)
+        self._dest_r = self._src_r * max(1.5, self._zoom_level)
+        if rebuild:
+            self._update_pixmap()
+        else:
+            self.update()
+
     def boundingRect(self) -> QRectF:
         x1 = min(self._src_c.x() - self._src_r, self._dest_c.x() - self._dest_r)
         y1 = min(self._src_c.y() - self._src_r, self._dest_c.y() - self._dest_r)
@@ -1055,7 +1067,7 @@ class MagnifierCalloutItem(QGraphicsItem):
         painter.drawEllipse(self._dest_c, self._dest_r, self._dest_r)
 
         if self.isSelected():
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             painter.drawEllipse(self._src_c, self._src_r + 2, self._src_r + 2)
             painter.drawEllipse(self._dest_c, self._dest_r + 2, self._dest_r + 2)
 
@@ -1265,7 +1277,7 @@ class ShapeItem(QGraphicsItem):
             self._cached_path = self._build_path()
         painter.drawPath(self._cached_path)
         if self.isSelected():
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRect(self._rect.adjusted(-2, -2, 2, 2))
 
@@ -1319,7 +1331,7 @@ class EmojiItem(QGraphicsItem):
         painter.drawText(x, y, self._emoji)
 
         if self.isSelected():
-            painter.setPen(QPen(QColor("#FF5D62"), 1, Qt.PenStyle.DashLine))
+            painter.setPen(QPen(QColor(ACCENT), 1, Qt.PenStyle.DashLine))
             painter.drawRect(self._rect.adjusted(-2, -2, 2, 2))
 
 
@@ -1507,6 +1519,6 @@ class CropOverlayItem(QGraphicsItem):
         painter.drawRect(cx + cw, cy, ox + ow - (cx + cw), ch)
 
         # Border around crop
-        painter.setPen(QPen(QColor("#FF5D62"), 2))
+        painter.setPen(QPen(QColor(ACCENT), 2))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRect(self._crop)

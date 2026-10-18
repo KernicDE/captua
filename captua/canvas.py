@@ -31,6 +31,7 @@ from PySide6.QtCore import QTimer
 
 from .history import History, RemoveItemCommand
 from .items import CanvasImageItem, MagnifierCalloutItem
+from .theme import ACCENT
 
 
 def snap_point(scene: "CanvasScene", point: QPointF, exclude_item=None, tolerance: float = 15.0) -> QPointF:
@@ -289,6 +290,9 @@ class CanvasView(QGraphicsView):
         self._glass_start_scene = None
         self._glass_dest_start = None
 
+        # Magnifier circle resize state: (item, "src" | "dest")
+        self._mag_resize = None
+
         # Shortcut overlay
         self._shortcut_overlay: QLabel | None = None
         self._hint_shown = False
@@ -481,6 +485,33 @@ class CanvasView(QGraphicsView):
         item._dest_c = self._glass_dest_start + delta
         item.update()
 
+    @staticmethod
+    def _mag_edge_point(item, which: str) -> QPointF:
+        """Scene position of a magnifier circle's resize handle (right edge)."""
+        if which == "src":
+            return item.mapToScene(item._src_c + QPointF(item._src_r, 0))
+        return item.mapToScene(item._dest_c + QPointF(item._dest_r, 0))
+
+    def _hit_magnifier_edge(self, viewport_pos):
+        if self._active_tool is None or self._active_tool.handles_mouse:
+            return None
+        scene_pos = self.mapToScene(viewport_pos)
+        hit_dist = max(8 / self.transform().m11(), 2)
+        for item in self.scene().selectedItems():
+            if not isinstance(item, MagnifierCalloutItem):
+                continue
+            for which in ("src", "dest"):
+                p = self._mag_edge_point(item, which)
+                if abs(scene_pos.x() - p.x()) < hit_dist and abs(scene_pos.y() - p.y()) < hit_dist:
+                    return item, which
+        return None
+
+    def _do_mag_resize(self, scene_pos: QPointF) -> None:
+        item, which = self._mag_resize
+        center = item.mapToScene(item._src_c if which == "src" else item._dest_c)
+        dist = math.hypot(scene_pos.x() - center.x(), scene_pos.y() - center.y())
+        item.set_src_radius(dist if which == "src" else dist / max(1.5, item._zoom_level), rebuild=False)
+
     def drawForeground(self, painter: QPainter, rect) -> None:
         super().drawForeground(painter, rect)
         if self._active_tool is None or self._active_tool.handles_mouse:
@@ -489,7 +520,7 @@ class CanvasView(QGraphicsView):
         handle_size = max(8 / scale, 2)
         pen_width = max(1 / scale, 0.5)
         # White handle with accent border for better contrast
-        painter.setPen(QPen(QColor("#FF5D62"), pen_width))
+        painter.setPen(QPen(QColor(ACCENT), pen_width))
         painter.setBrush(QColor("#E8E8E8"))
         for item in self.scene().selectedItems():
             if not self._item_supports_resize(item):
@@ -507,12 +538,17 @@ class CanvasView(QGraphicsView):
                     handle_size,
                     handle_size,
                 )
-        # Draw glass drag handle for selected magnifiers
+        # Draw glass drag handle and circle resize handles for selected magnifiers
         for item in self.scene().selectedItems():
             if not isinstance(item, MagnifierCalloutItem):
                 continue
+            for which in ("src", "dest"):
+                e = self._mag_edge_point(item, which)
+                painter.setPen(QPen(QColor(ACCENT), pen_width))
+                painter.setBrush(QColor("#E8E8E8"))
+                painter.drawRect(e.x() - handle_size / 2, e.y() - handle_size / 2, handle_size, handle_size)
             dest = item.mapToScene(item._dest_c)
-            painter.setPen(QPen(QColor("#FF5D62"), pen_width))
+            painter.setPen(QPen(QColor(ACCENT), pen_width))
             painter.setBrush(QColor("#E8E8E8"))
             painter.drawRect(
                 dest.x() - handle_size / 2,
@@ -539,6 +575,11 @@ class CanvasView(QGraphicsView):
             self._resize_handle = handle
             self._resize_start_local = item.mapFromScene(self._scene_pos(event))
             self._resize_start_rect = QRectF(self._item_rect(item))
+            event.accept()
+            return
+        edge = self._hit_magnifier_edge(event.pos())
+        if edge is not None:
+            self._mag_resize = edge
             event.accept()
             return
         glass_item = self._hit_magnifier_glass(event.pos())
@@ -571,6 +612,10 @@ class CanvasView(QGraphicsView):
             self._do_resize(self._scene_pos(event))
             event.accept()
             return
+        if self._mag_resize is not None:
+            self._do_mag_resize(self._scene_pos(event))
+            event.accept()
+            return
         if self._glass_item is not None:
             self._do_glass_drag(self._scene_pos(event))
             event.accept()
@@ -582,6 +627,9 @@ class CanvasView(QGraphicsView):
         item, handle = self._hit_resize_handle(event.pos())
         if item is not None:
             self.setCursor(self._handle_cursor(handle))
+            return
+        if self._hit_magnifier_edge(event.pos()) is not None:
+            self.setCursor(Qt.CursorShape.SizeHorCursor)
             return
         glass_item = self._hit_magnifier_glass(event.pos())
         if glass_item is not None:
@@ -602,6 +650,12 @@ class CanvasView(QGraphicsView):
             self._resize_handle = None
             self._resize_start_local = None
             self._resize_start_rect = None
+            self.scene()._expand_scene_if_needed()
+            event.accept()
+            return
+        if event.button() == Qt.MouseButton.LeftButton and self._mag_resize is not None:
+            self._mag_resize[0]._update_pixmap()
+            self._mag_resize = None
             self.scene()._expand_scene_if_needed()
             event.accept()
             return

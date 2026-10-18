@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
+from .theme import accent_css
 
 _SHAPES = [
     ("heart", "♥", "Heart"),
@@ -22,7 +23,7 @@ _SHAPES = [
     ("moon", "☾", "Moon"),
 ]
 
-_DIALOG_STYLE = """
+_DIALOG_STYLE = accent_css("""
     QDialog {
         background-color: #16161D;
     }
@@ -41,9 +42,9 @@ _DIALOG_STYLE = """
     QPushButton:pressed {
         background-color: #54546D;
     }
-"""
+""")
 
-_BTN_STYLE = _DIALOG_STYLE + """
+_BTN_STYLE = _DIALOG_STYLE + accent_css("""
     QPushButton {
         font-size: 22px;
         min-width: 64px;
@@ -53,7 +54,7 @@ _BTN_STYLE = _DIALOG_STYLE + """
         background-color: #5C3A2E;
         border: 1px solid #FF5D62;
     }
-"""
+""")
 
 
 class ShapePickerDialog(QDialog):

@@ -12,7 +12,6 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
 from .capture import CaptureCancelled, capture_region, capture_screen, screen_at_cursor
-from .overlay import OverlayWindow
 from .settings import load_settings
 
 from . import __version__
@@ -80,6 +79,9 @@ def main() -> int:
     font.setFamilies(["Inter", "Noto Sans", "DejaVu Sans"])
     font.setPointSize(10)
     app.setFont(font)
+
+    # theme reads the system accent at import, so it needs the QApplication first
+    from .overlay import OverlayWindow
 
     # Global tooltip style — bright text on dark background so tooltips are readable
     app.setStyleSheet("""

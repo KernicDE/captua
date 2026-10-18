@@ -1,6 +1,6 @@
 """Floating pill toolbars: four corner clusters (close, actions, tools, properties)."""
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
@@ -9,13 +9,11 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMenu,
     QPushButton,
-    QSizePolicy,
-    QSlider,
     QWidget,
 )
 
 from .icons import icon
-from .popups import EmojiPopup, MagnifierPopup, ShapePopup
+from .popups import PRESET_COLORS, ColorPalettePopup, EmojiPopup, ShapePopup
 from .theme import (
     ACTION_BUTTON_STYLE,
     EDIT_STYLE,
@@ -23,7 +21,6 @@ from .theme import (
     PILL_STYLE,
     PRIMARY_BUTTON_STYLE,
     SEPARATOR_STYLE,
-    SLIDER_STYLE,
     TEXT,
     TOOL_BUTTON_STYLE,
 )
@@ -78,21 +75,27 @@ class ToolButton(QPushButton):
 
 
 class ColorSwatch(QPushButton):
-    """Color picker button — opens a colour-wheel dialog on click."""
+    """Colour button: hovering shows a row of fixed colours above it."""
 
     color_changed = Signal(QColor)
 
-    def __init__(self, initial_color: QColor | None = None, parent=None) -> None:
+    def __init__(self, initial_color: QColor | None = None, parent=None, colors: list[tuple[str, str]] = PRESET_COLORS) -> None:
         super().__init__(parent)
         self._color = QColor(initial_color) if initial_color is not None else QColor("#FF5D62")
+        self._colors = colors
+        self._palette: ColorPalettePopup | None = None
+        self._hide_timer = QTimer(self)
+        self._hide_timer.setSingleShot(True)
+        self._hide_timer.setInterval(250)
+        self._hide_timer.timeout.connect(self._hide_palette)
         self.setFixedSize(28, 28)
         self._update_style()
         self.setAccessibleName("Colour")
         self._update_tooltip()
-        self.clicked.connect(self._open_wheel)
+        self.clicked.connect(self._show_palette)
 
     def _update_tooltip(self) -> None:
-        self.setToolTip(f"Colour {self._color.name().upper()} - click to change")
+        self.setToolTip(f"Colour {self._color.name().upper()} - hover to change")
 
     def _update_style(self) -> None:
         self._update_tooltip()
@@ -108,13 +111,41 @@ class ColorSwatch(QPushButton):
             }}
         """)
 
-    def _open_wheel(self) -> None:
-        from .colorwheel import ColorWheelDialog
-        dialog = ColorWheelDialog(self._color, self)
-        if dialog.exec() == 1:  # Accepted
-            self._color = dialog.selected_color()
-            self._update_style()
-            self.color_changed.emit(self._color)
+    # -- preset palette ------------------------------------------------------
+
+    def _show_palette(self) -> None:
+        win = self.window()
+        if self._palette is None:
+            self._palette = ColorPalettePopup(win, self._colors)
+            self._palette.color_picked.connect(self._on_preset)
+            self._palette.hover_changed.connect(self._on_palette_hover)
+        pal = self._palette
+        x = self.mapTo(win, QPoint(0, 0)).x() + (self.width() - pal.width()) // 2
+        x = max(4, min(x, win.width() - pal.width() - 4))
+        pal.move(x, self.mapTo(win, QPoint(0, 0)).y() - pal.height() - 4)
+        pal.show()
+        pal.raise_()
+
+    def _hide_palette(self) -> None:
+        if self._palette is not None:
+            self._palette.hide()
+
+    def _on_palette_hover(self, inside: bool) -> None:
+        self._hide_timer.stop() if inside else self._hide_timer.start()
+
+    def _on_preset(self, color: QColor) -> None:
+        self.set_color(color)
+        self.color_changed.emit(self._color)
+        self._hide_palette()
+
+    def enterEvent(self, event) -> None:
+        self._hide_timer.stop()
+        self._show_palette()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self._hide_timer.start()
+        super().leaveEvent(event)
 
     def color(self) -> QColor:
         return self._color
@@ -122,6 +153,75 @@ class ColorSwatch(QPushButton):
     def set_color(self, color: QColor) -> None:
         self._color = QColor(color)
         self._update_style()
+
+
+_STEPPER_BTN_STYLE = ACTION_BUTTON_STYLE + "QPushButton { padding: 0; font-size: 15px; }"
+
+_WIDTH_STEPS = [*range(1, 26), *range(30, 101, 5), *range(110, 201, 10)]
+_ALPHA_STEPS = list(range(0, 101, 5))
+_ZOOM_STEPS = [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
+
+
+class Stepper(QWidget):
+    """[-] value [+] control over a fixed list of steps (typed values snap to the nearest)."""
+
+    value_changed = Signal(float)
+
+    def __init__(self, steps: list[float], fmt, tooltip: str, edit_width: int = 34, parent=None) -> None:
+        super().__init__(parent)
+        self._steps = steps
+        self._fmt = fmt
+        self._i = 0
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(2)
+        self._minus = self._make_btn("−", "Decrease", -1)
+        self._plus = self._make_btn("+", "Increase", 1)
+        self._edit = QLineEdit()
+        self._edit.setFixedWidth(edit_width)
+        self._edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._edit.setStyleSheet(EDIT_STYLE)
+        self._edit.setToolTip(tooltip)
+        self._edit.setAccessibleName(tooltip)
+        self._edit.editingFinished.connect(self._on_edit)
+        for w in (self._minus, self._edit, self._plus):
+            row.addWidget(w)
+        self.set_value(steps[0])
+
+    def _make_btn(self, text: str, name: str, delta: int) -> QPushButton:
+        btn = QPushButton(text)
+        btn.setFixedSize(22, 24)
+        btn.setAutoRepeat(True)
+        btn.setStyleSheet(_STEPPER_BTN_STYLE)
+        btn.setAccessibleName(name)
+        btn.clicked.connect(lambda: self._move(delta))
+        return btn
+
+    def value(self) -> float:
+        return self._steps[self._i]
+
+    def set_value(self, v: float) -> None:
+        """Show the step nearest to `v` without emitting."""
+        self._i = min(range(len(self._steps)), key=lambda i: abs(self._steps[i] - v))
+        self._edit.setText(self._fmt(self._steps[self._i]))
+        self._minus.setEnabled(self._i > 0)
+        self._plus.setEnabled(self._i < len(self._steps) - 1)
+
+    def _move(self, delta: int) -> None:
+        i = max(0, min(len(self._steps) - 1, self._i + delta))
+        if i != self._i:
+            self.set_value(self._steps[i])
+            self.value_changed.emit(self.value())
+
+    def _on_edit(self) -> None:
+        try:
+            v = float(self._edit.text().replace("%", "").replace("x", "").replace("px", "").strip())
+        except ValueError:
+            v = self.value()
+        old = self.value()
+        self.set_value(v)
+        if self.value() != old:
+            self.value_changed.emit(self.value())
 
 
 class Toolbar(QWidget):
@@ -262,27 +362,10 @@ class Toolbar(QWidget):
         self._line_color_btn.color_changed.connect(self.line_color_changed.emit)
         props_layout.addWidget(self._line_color_btn)
 
-        self._line_width_slider = QSlider(Qt.Orientation.Horizontal)
-        self._line_width_slider.setRange(1, 20)
-        self._line_width_slider.setValue(3)
-        self._line_width_slider.setFixedWidth(48)
-        self._line_width_slider.setStyleSheet(SLIDER_STYLE)
-        self._line_width_slider.setSizePolicy(
-            QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        )
-        self._line_width_slider.valueChanged.connect(self._on_line_width_changed)
-        props_layout.addWidget(self._line_width_slider)
-
-        self._line_width_edit = QLineEdit("3")
-        self._line_width_edit.setFixedWidth(28)
-        self._line_width_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._line_width_edit.setStyleSheet(EDIT_STYLE)
-        self._line_width_edit.setSizePolicy(
-            QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        )
-        self._line_width_edit.editingFinished.connect(self._on_line_width_edit_changed)
-        props_layout.addWidget(self._line_width_edit)
-        self._on_line_width_changed(3)
+        self._line_width = Stepper(_WIDTH_STEPS, lambda v: f"{v:g}", "Stroke width (px)")
+        self._line_width.set_value(3)
+        self._line_width.value_changed.connect(self.line_width_changed.emit)
+        props_layout.addWidget(self._line_width)
 
         props_layout.addSpacing(6)
 
@@ -295,43 +378,40 @@ class Toolbar(QWidget):
         self._fill_color_btn.color_changed.connect(self.fill_color_changed.emit)
         props_layout.addWidget(self._fill_color_btn)
 
-        self._fill_alpha_slider = QSlider(Qt.Orientation.Horizontal)
-        self._fill_alpha_slider.setRange(0, 100)
-        self._fill_alpha_slider.setValue(50)
-        self._fill_alpha_slider.setFixedWidth(48)
-        self._fill_alpha_slider.setStyleSheet(SLIDER_STYLE)
-        self._fill_alpha_slider.setSizePolicy(
-            QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        )
-        self._fill_alpha_slider.valueChanged.connect(self._on_fill_alpha_changed)
-        props_layout.addWidget(self._fill_alpha_slider)
+        self._fill_alpha = Stepper(_ALPHA_STEPS, lambda v: f"{v:g}%", "Fill opacity", edit_width=40)
+        self._fill_alpha.set_value(50)
+        self._fill_alpha.value_changed.connect(lambda v: self.fill_alpha_changed.emit(int(v / 100 * 255)))
+        props_layout.addWidget(self._fill_alpha)
 
-        self._fill_alpha_edit = QLineEdit("50%")
-        self._fill_alpha_edit.setFixedWidth(32)
-        self._fill_alpha_edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._fill_alpha_edit.setStyleSheet(EDIT_STYLE)
-        self._fill_alpha_edit.setSizePolicy(
-            QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        )
-        self._fill_alpha_edit.editingFinished.connect(self._on_fill_alpha_edit_changed)
-        props_layout.addWidget(self._fill_alpha_edit)
-        self._on_fill_alpha_changed(50)
+        # Magnifier zoom factor; only shown while a magnifier is relevant
+        self._zoom_group = QWidget()
+        zoom_row = QHBoxLayout(self._zoom_group)
+        zoom_row.setContentsMargins(0, 0, 0, 0)
+        zoom_row.setSpacing(4)
+        zoom_row.addSpacing(6)
+        zoom_label = QLabel("Zoom")
+        zoom_label.setStyleSheet(f"color: {TEXT}; font-size: 12px;")
+        zoom_row.addWidget(zoom_label)
+        self._zoom = Stepper(_ZOOM_STEPS, lambda v: f"{v:.1f}x", "Magnifier zoom factor", edit_width=40)
+        self._zoom.set_value(2.0)
+        self._zoom.value_changed.connect(self._on_zoom_changed)
+        zoom_row.addWidget(self._zoom)
+        props_layout.addWidget(self._zoom_group)
+        self._zoom_group.hide()
 
         # Freeze each pill at its natural width
         self._pills = [self.pill_close, self.pill_actions, self.pill_tools, self.pill_props]
-        self._props_visible = True  # until the first set_properties_visible call
         for pill in self._pills:
             pill.layout().activate()
             pill.setFixedWidth(pill.sizeHint().width())
             pill.hide()
 
+        self._zoom_width = self._zoom_group.sizeHint().width() + props_layout.spacing()
         self._full_width = self._compute_full_width()
 
         # Popups (lazy)
         self._shape_popup: ShapePopup | None = None
         self._emoji_popup: EmojiPopup | None = None
-        self._mag_zoom_popup: MagnifierPopup | None = None
-        self._current_mag_zoom: float = 2.0
 
     @staticmethod
     def _make_icon_action(icon_name: str, tooltip: str) -> QPushButton:
@@ -348,7 +428,9 @@ class Toolbar(QWidget):
     def _compute_full_width(self) -> int:
         """Window width needed so both pill rows fit side by side (+margins)."""
         top = self.pill_close.width() + self.pill_actions.width()
-        bottom = self.pill_tools.width() + self.pill_props.width()
+        # reserve room for the zoom group so showing it never overflows the window
+        extra = 0 if self._zoom_group.isVisibleTo(self.pill_props) else self._zoom_width
+        bottom = self.pill_tools.width() + self.pill_props.width() + extra
         return max(top, bottom) + 40  # outer margins + gap between pills
 
     # -- pill visibility / sizing (called from overlay) -------------------------
@@ -356,8 +438,6 @@ class Toolbar(QWidget):
     def set_pills_visible(self, visible: bool) -> None:
         for pill in self._pills:
             pill.setVisible(visible)
-        if visible and not self._props_visible:
-            self.pill_props.hide()
         self.pills_changed.emit()
 
     def full_width(self) -> int:
@@ -387,8 +467,6 @@ class Toolbar(QWidget):
             self._show_shape_popup()
         elif key == "emoji":
             self._show_emoji_popup()
-        elif key == "magnifier":
-            self._show_magnifier_popup()
 
     def _show_shape_popup(self) -> None:
         btn = self._buttons.get("shape")
@@ -397,7 +475,7 @@ class Toolbar(QWidget):
         if self._shape_popup is None:
             self._shape_popup = ShapePopup()
             self._shape_popup.shape_selected.connect(self.shape_selected.emit)
-        self._shape_popup.show_below(btn)
+        self._shape_popup.show_above(btn)
 
     def _show_emoji_popup(self) -> None:
         btn = self._buttons.get("emoji")
@@ -406,18 +484,7 @@ class Toolbar(QWidget):
         if self._emoji_popup is None:
             self._emoji_popup = EmojiPopup()
             self._emoji_popup.emoji_selected.connect(self.emoji_selected.emit)
-        self._emoji_popup.show_below(btn)
-
-    def _show_magnifier_popup(self) -> None:
-        btn = self._buttons.get("magnifier")
-        if btn is None:
-            return
-        if self._mag_zoom_popup is None:
-            self._mag_zoom_popup = MagnifierPopup(self._current_mag_zoom)
-            self._mag_zoom_popup.zoom_changed.connect(self.magnifier_zoom_changed.emit)
-        else:
-            self._mag_zoom_popup.set_zoom(self._current_mag_zoom)
-        self._mag_zoom_popup.show_below(btn)
+        self._emoji_popup.show_above(btn)
 
     # -- property setters (called from overlay) --------------------------------
 
@@ -425,24 +492,26 @@ class Toolbar(QWidget):
         self._line_color_btn.set_color(color)
 
     def set_line_width(self, width: float) -> None:
-        self._line_width_slider.blockSignals(True)
-        self._line_width_slider.setValue(int(width))
-        self._line_width_slider.blockSignals(False)
-        self._on_line_width_changed(int(width))
+        self._line_width.set_value(width)
 
     def set_fill_color(self, color: QColor) -> None:
         self._fill_color_btn.set_color(color)
 
     def set_fill_alpha(self, alpha: int) -> None:
-        self._fill_alpha_slider.blockSignals(True)
-        self._fill_alpha_slider.setValue(int(alpha / 255 * 100))
-        self._fill_alpha_slider.blockSignals(False)
-        self._on_fill_alpha_changed(int(alpha / 255 * 100))
+        self._fill_alpha.set_value(alpha / 255 * 100)
 
     def set_magnifier_zoom(self, zoom: float) -> None:
-        self._current_mag_zoom = zoom
-        if self._mag_zoom_popup is not None and self._mag_zoom_popup.isVisible():
-            self._mag_zoom_popup.set_zoom(zoom)
+        self._zoom.set_value(zoom)
+
+    def set_zoom_visible(self, visible: bool) -> None:
+        """Show the magnifier zoom stepper (resizes the props pill)."""
+        if self._zoom_group.isVisibleTo(self.pill_props) == visible:
+            return
+        self._zoom_group.setVisible(visible)
+        self.pill_props.layout().activate()
+        self.pill_props.setFixedWidth(self.pill_props.sizeHint().width())
+        self._full_width = self._compute_full_width()
+        self.pills_changed.emit()
 
     def set_tool(self, key: str) -> None:
         if key in self._buttons:
@@ -470,39 +539,10 @@ class Toolbar(QWidget):
     def active_tool(self) -> str:
         return self._active
 
-    def set_properties_visible(self, visible: bool) -> None:
-        self._props_visible = visible
-        self.pill_props.setVisible(visible and self.pill_tools.isVisible())
-        self.pills_changed.emit()
-
     # -- change handlers -------------------------------------------------------
 
-    def _on_line_width_changed(self, value: int) -> None:
-        self._line_width_slider.setToolTip(f"{value} px")
-        self._line_width_edit.setText(str(value))
-        self.line_width_changed.emit(float(value))
-
-    def _on_line_width_edit_changed(self) -> None:
-        try:
-            value = int(self._line_width_edit.text())
-            value = max(1, min(20, value))
-        except ValueError:
-            value = self._line_width_slider.value()
-        self._line_width_slider.setValue(value)
-
-    def _on_fill_alpha_changed(self, value: int) -> None:
-        self._fill_alpha_slider.setToolTip(f"{value}%")
-        self._fill_alpha_edit.setText(f"{value}%")
-        self.fill_alpha_changed.emit(int(value / 100 * 255))
-
-    def _on_fill_alpha_edit_changed(self) -> None:
-        try:
-            text = self._fill_alpha_edit.text().replace("%", "")
-            value = int(text)
-            value = max(0, min(100, value))
-        except ValueError:
-            value = self._fill_alpha_slider.value()
-        self._fill_alpha_slider.setValue(value)
+    def _on_zoom_changed(self, zoom: float) -> None:
+        self.magnifier_zoom_changed.emit(zoom)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         mapping = {

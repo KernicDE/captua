@@ -19,9 +19,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .popups import BACKDROP_COLORS
 from .toolbar import ColorSwatch
+from .theme import ACCENT, accent_css
 
-_POPUP_STYLE = """
+_POPUP_STYLE = accent_css("""
     QFrame#backdrop_frame {
         background-color: #1A1A1A;
         border: 1px solid #2A2A2A;
@@ -66,7 +68,7 @@ _POPUP_STYLE = """
         background: #FF5D62;
         border-radius: 2px;
     }
-"""
+""")
 
 
 class _AngleDial(QWidget):
@@ -101,7 +103,7 @@ class _AngleDial(QWidget):
         ey = cy - math.sin(angle_rad) * (radius - 2)
         painter.drawLine(QPointF(cx, cy), QPointF(ex, ey))
         # Small dot at the tip
-        painter.setBrush(QColor("#FF5D62"))
+        painter.setBrush(QColor(ACCENT))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(QPointF(ex, ey), 3, 3)
         painter.end()
@@ -170,16 +172,16 @@ class BackdropPopup(QWidget):
         form.addRow(mode_row)
 
         # Solid backdrop color (shown when Colour mode)
-        self._color_btn = ColorSwatch(QColor(scene.backdrop_color))
+        self._color_btn = ColorSwatch(QColor(scene.backdrop_color), colors=BACKDROP_COLORS)
         self._color_btn.color_changed.connect(self._apply)
         form.addRow(self._color_btn)
 
         # Gradient start / end (shown when Gradient mode)
         grad_row = QHBoxLayout()
         grad_row.setSpacing(6)
-        self._grad_start_btn = ColorSwatch(QColor(scene.backdrop_gradient_start))
+        self._grad_start_btn = ColorSwatch(QColor(scene.backdrop_gradient_start), colors=BACKDROP_COLORS)
         self._grad_start_btn.color_changed.connect(self._apply)
-        self._grad_end_btn = ColorSwatch(QColor(scene.backdrop_gradient_end))
+        self._grad_end_btn = ColorSwatch(QColor(scene.backdrop_gradient_end), colors=BACKDROP_COLORS)
         self._grad_end_btn.color_changed.connect(self._apply)
         self._angle_dial = _AngleDial(getattr(scene, "backdrop_gradient_angle", 45))
         self._angle_dial.angle_changed.connect(self._apply)

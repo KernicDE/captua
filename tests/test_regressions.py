@@ -119,3 +119,44 @@ def test_zoom_out_builds_exact_lanczos_pixmap(qapp):
     item._pending_key = (100, 75)
     item._build_exact((50, 40))  # stale key: zoom moved on, must be ignored
     assert item._exact_key == (200, 150)
+
+
+def test_stepper_steps_and_snapping(qapp):
+    from captua.toolbar import Stepper, _ALPHA_STEPS, _WIDTH_STEPS
+
+    st = Stepper(_WIDTH_STEPS, lambda v: f"{v:g}", "w")
+    got = []
+    st.value_changed.connect(got.append)
+    st.set_value(25)
+    st._move(1)
+    st._move(1)
+    assert got == [30, 35]
+    st.set_value(100)
+    st._move(1)
+    assert got[-1] == 110
+    st.set_value(3.4)
+    assert st.value() == 3
+    assert _ALPHA_STEPS[:3] == [0, 5, 10] and _ALPHA_STEPS[-1] == 100
+
+
+def test_emoji_popup_search_and_tabs(qapp):
+    from captua.popups import EmojiPopup, _EMOJI_GROUPS
+
+    assert len(_EMOJI_GROUPS) == 9
+    popup = EmojiPopup()
+    popup._search.setText("heart")
+    assert popup._model.rowCount() > 0
+    popup._search.setText("")
+    popup._tabs.setCurrentIndex(8)
+    assert popup._model.item(0).text() in _EMOJI_GROUPS[8]
+
+
+def test_magnifier_src_radius_keeps_zoom(qapp):
+    from PySide6.QtCore import QPointF
+    from PySide6.QtGui import QPixmap
+
+    from captua.items import MagnifierCalloutItem
+
+    item = MagnifierCalloutItem(QPointF(0, 0), 20, QPointF(100, 0), 40, QPixmap(10, 10), 2.0)
+    item.set_src_radius(30, rebuild=False)
+    assert item._src_r == 30 and item._dest_r == 60

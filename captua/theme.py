@@ -1,6 +1,25 @@
 """Central palette and stylesheet builders for the modern pill UI."""
 
-# Palette — single accent (the brand red used for annotations).
+from PySide6.QtGui import QColor, QGuiApplication, QPalette
+
+BRAND_RED = "#FF5D62"  # default annotation colour and fallback accent
+
+
+def _mix(a: QColor, b: QColor, t: float) -> QColor:
+    return QColor.fromRgbF(*(a.getRgbF()[i] * t + b.getRgbF()[i] * (1 - t) for i in range(3)))
+
+
+def _system_accent() -> QColor:
+    """System accent from the Qt palette; needs a QApplication, else brand red."""
+    app = QGuiApplication.instance()
+    c = app.palette().color(QPalette.ColorRole.Accent) if app else QColor()
+    if not c.isValid():
+        return QColor(BRAND_RED)
+    h, s, l, _ = c.getHsl()
+    return QColor.fromHsl(h, s, max(l, 130))  # keep contrast on the dark UI
+
+
+# Palette — UI accent follows the system; import theme only after QApplication exists.
 WINDOW_BG = "#101014"
 PILL_BG = "#1A1A1F"
 PILL_BORDER = "#3A3A44"  # >= 1.6:1 against PILL_BG so pills stay visible on bright screenshots
@@ -8,10 +27,19 @@ HOVER_BG = "#26262C"
 PRESSED_BG = "#30303A"
 TEXT = "#E8E8E8"
 TEXT_DIM = "#9A9AA2"
-ACCENT = "#FF5D62"
-ACCENT_TINT = "rgba(255, 93, 98, 0.18)"
-ACCENT_HOVER = "#FF7074"
-ACCENT_PRESSED = "#E14A4F"
+_ACC = _system_accent()
+ACCENT = _ACC.name().upper()
+ACCENT_TINT = f"rgba({_ACC.red()}, {_ACC.green()}, {_ACC.blue()}, 0.18)"
+ACCENT_HOVER = _ACC.lighter(115).name().upper()
+ACCENT_PRESSED = _ACC.darker(115).name().upper()
+ACCENT_DEEP = _mix(_ACC, QColor("#1A1A1A"), 0.25).name().upper()  # selected-item background
+ACCENT_DISABLED_BG = _mix(_ACC, QColor(PILL_BG), 0.25).name().upper()
+ACCENT_DISABLED_FG = _mix(_ACC, QColor(PILL_BG), 0.6).name().upper()
+
+
+def accent_css(css: str) -> str:
+    """Swap the brand-red literals of a plain stylesheet for the system accent."""
+    return css.replace(BRAND_RED, ACCENT).replace("#5C3A2E", ACCENT_DEEP)
 
 RADIUS_PILL = 14
 RADIUS_BUTTON = 8
@@ -93,8 +121,8 @@ PRIMARY_BUTTON_STYLE = f"""
         border: 2px solid {TEXT};
     }}
     QPushButton:disabled {{
-        background-color: #4A2A2C;
-        color: #B08A8C;
+        background-color: {ACCENT_DISABLED_BG};
+        color: {ACCENT_DISABLED_FG};
     }}
 """
 
