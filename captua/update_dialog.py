@@ -1,7 +1,7 @@
 """Non-blocking update-available dialog."""
 
 from PySide6.QtCore import Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QTextDocument
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -55,11 +55,16 @@ class UpdateDialog(QWidget):
 
         changelog_widget = QTextEdit()
         changelog_widget.setReadOnly(True)
-        changelog_widget.setPlainText(changelog)
+        # GitHub release notes are Markdown; raw HTML in them stays inert
+        changelog_widget.document().setMarkdown(
+            changelog,
+            QTextDocument.MarkdownFeature.MarkdownDialectGitHub
+            | QTextDocument.MarkdownFeature.MarkdownNoHTML,
+        )
         changelog_widget.setStyleSheet(
             "QTextEdit { background-color: #1A1A1A; color: #E8E8E8; "
             "border: 1px solid #2A2A2A; border-radius: 10px; padding: 10px; "
-            "font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }"
+            "font-size: 13px; }"
         )
         changelog_widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         changelog_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)

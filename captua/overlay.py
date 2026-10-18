@@ -49,6 +49,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from . import __version__
 from .backdrop import BackdropPopup
 from .canvas import CanvasScene, CanvasView, draw_backdrop
 from .settings import apply_to_scene, extract_from_scene, load_settings, save_settings
@@ -175,6 +176,14 @@ class OverlayWindow(QMainWindow):
         self._toast.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._toast.setStyleSheet(TOAST_STYLE)
         self._toast.hide()
+
+        # Faint version tag in the bottom-right corner, below the pills
+        self._version_label = QLabel(f"v{__version__}", self)
+        self._version_label.setStyleSheet(
+            "color: rgba(154, 154, 162, 0.45); font-size: 8px; background: transparent;"
+        )
+        self._version_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._version_label.adjustSize()
 
         # Canvas fills the whole window below the floating toolbar
         self._scene = CanvasScene(self)
@@ -467,6 +476,9 @@ class OverlayWindow(QMainWindow):
         tb.pill_tools.move(m, yb)
         px = max(m + tb.pill_tools.width() + gap, self.width() - m - tb.pill_props.width())
         tb.pill_props.move(px, yb)
+        vl = self._version_label
+        vl.move(self.width() - vl.width() - 8, self.height() - vl.height())
+        vl.raise_()
         for pill in (tb.pill_close, tb.pill_actions, tb.pill_tools, tb.pill_props):
             pill.raise_()
 
