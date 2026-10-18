@@ -167,12 +167,10 @@ class UpdateDialog(QWidget):
 
     def _on_open_page(self) -> None:
         QDesktopServices.openUrl(QUrl(self._url))
-        self.close()
-        self.dismissed.emit()
+        self.close()  # closeEvent emits dismissed
 
     def _on_later(self) -> None:
-        self.close()
-        self.dismissed.emit()
+        self.close()  # closeEvent emits dismissed
 
     def _on_skip(self) -> None:
         self.close()

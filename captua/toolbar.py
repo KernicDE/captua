@@ -1,13 +1,12 @@
 """Floating pill toolbars: four corner clusters (close, actions, tools, properties)."""
 
 from PySide6.QtCore import QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QKeyEvent, QPixmap
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMenu,
     QPushButton,
     QWidget,
 )
@@ -17,7 +16,6 @@ from .popups import PRESET_COLORS, ColorPalettePopup, EmojiPopup, ShapePopup
 from .theme import (
     ACTION_BUTTON_STYLE,
     EDIT_STYLE,
-    MENU_STYLE,
     PILL_STYLE,
     PRIMARY_BUTTON_STYLE,
     SEPARATOR_STYLE,
@@ -543,29 +541,3 @@ class Toolbar(QWidget):
 
     def _on_zoom_changed(self, zoom: float) -> None:
         self.magnifier_zoom_changed.emit(zoom)
-
-    def keyPressEvent(self, event: QKeyEvent) -> None:
-        mapping = {
-            Qt.Key.Key_V: "select",
-            Qt.Key.Key_R: "rectangle",
-            Qt.Key.Key_O: "ellipse",
-            Qt.Key.Key_L: "line",
-            Qt.Key.Key_A: "arrow",
-            Qt.Key.Key_P: "pen",
-            Qt.Key.Key_M: "marker",
-            Qt.Key.Key_T: "text",
-            Qt.Key.Key_K: "label",
-            Qt.Key.Key_N: "counter",
-            Qt.Key.Key_U: "ruler",
-            Qt.Key.Key_I: "spotlight",
-            Qt.Key.Key_B: "blur",
-            Qt.Key.Key_G: "magnifier",
-            Qt.Key.Key_D: "eyedropper",
-            Qt.Key.Key_S: "shape",
-            Qt.Key.Key_E: "emoji",
-        }
-        if event.key() in mapping:
-            self.set_tool(mapping[event.key()])
-            event.accept()
-            return
-        super().keyPressEvent(event)

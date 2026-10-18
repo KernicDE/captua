@@ -8,7 +8,6 @@ from PySide6.QtGui import (
     QColor,
     QDragEnterEvent,
     QDropEvent,
-    QFont,
     QKeyEvent,
     QLinearGradient,
     QMouseEvent,
@@ -18,10 +17,8 @@ from PySide6.QtGui import (
     QWheelEvent,
 )
 from PySide6.QtWidgets import (
-    QApplication,
     QFrame,
     QGraphicsItem,
-    QGraphicsPixmapItem,
     QGraphicsScene,
     QGraphicsTextItem,
     QGraphicsView,
@@ -29,7 +26,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import QTimer
 
-from .history import History, RemoveItemCommand
+from .history import AddItemCommand, History, RemoveItemCommand, capture_state, push_changes, snapshot
+from .imageio import load_image_file
 from .items import CanvasImageItem, MagnifierCalloutItem
 from .theme import ACCENT
 
@@ -216,9 +214,8 @@ class CanvasScene(QGraphicsScene):
         )
         if pos is not None:
             item.setPos(pos)
-        self.addItem(item)
         self._image_items.append(item)
-        self._expand_scene_if_needed()
+        self._history.push(AddItemCommand(self, item))  # undoable, also adds to the scene
         self.update()
         return item
 
@@ -289,6 +286,9 @@ class CanvasView(QGraphicsView):
         self._glass_item = None
         self._glass_start_scene = None
         self._glass_dest_start = None
+
+        # Item states at the start of a move/resize drag, diffed on release for undo
+        self._edit_before = None
 
         # Magnifier circle resize state: (item, "src" | "dest")
         self._mag_resize = None
@@ -569,6 +569,10 @@ class CanvasView(QGraphicsView):
             self._active_tool.mouse_press(event, self._scene_pos(event))
             event.accept()
             return
+        if event.button() != Qt.MouseButton.LeftButton:
+            super().mousePressEvent(event)  # handles/glass only react to the left button
+            return
+        self._edit_before = snapshot(self.scene())
         item, handle = self._hit_resize_handle(event.pos())
         if item is not None:
             self._resize_item = item
@@ -639,6 +643,16 @@ class CanvasView(QGraphicsView):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        before, self._edit_before = (
+            (self._edit_before, None) if event.button() == Qt.MouseButton.LeftButton else (None, self._edit_before)
+        )
+        try:
+            self._handle_release(event)
+        finally:
+            if before is not None and self.scene() is not None:
+                push_changes(self.scene(), before)
+
+    def _handle_release(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.MiddleButton:
             self._panning = False
             self._pan_start = None
@@ -710,8 +724,8 @@ class CanvasView(QGraphicsView):
         if not handled and mime.hasUrls():
             for url in mime.urls():
                 if url.isLocalFile():
-                    pixmap = QPixmap(url.toLocalFile())
-                    if not pixmap.isNull():
+                    pixmap = load_image_file(url.toLocalFile())
+                    if pixmap is not None:
                         scene.add_image(pixmap, pos)
                         handled = True
                         break
@@ -794,7 +808,7 @@ class CanvasView(QGraphicsView):
                 return
 
         # Shortcut help overlay
-        if event.key() == Qt.Key.Key_Question and not (event.modifiers() & Qt.KeyboardModifier.ShiftModifier):
+        if event.key() == Qt.Key.Key_Question:
             self._show_shortcut_overlay()
             event.accept()
             return
@@ -853,17 +867,15 @@ class CanvasView(QGraphicsView):
                 if item is not scene.base_image():
                     scene.history().push(RemoveItemCommand(scene, item))
             event.accept()
-        elif event.key() == Qt.Key.Key_PageUp:
-            for item in self.scene().selectedItems():
-                if item is not self.scene().base_image():
-                    item.setZValue(item.zValue() + 1)
-            self.scene().update()
-            event.accept()
-        elif event.key() == Qt.Key.Key_PageDown:
-            for item in self.scene().selectedItems():
-                if item is not self.scene().base_image() and item.zValue() > 0.1:
-                    item.setZValue(item.zValue() - 1)
-            self.scene().update()
+        elif event.key() in (Qt.Key.Key_PageUp, Qt.Key.Key_PageDown):
+            delta = 1 if event.key() == Qt.Key.Key_PageUp else -1
+            scene = self.scene()
+            before = {i: capture_state(i) for i in scene.selectedItems() if i is not scene.base_image()}
+            for item in before:
+                if delta > 0 or item.zValue() > 0.1:
+                    item.setZValue(item.zValue() + delta)
+            push_changes(scene, before)
+            scene.update()
             event.accept()
         elif event.key() == Qt.Key.Key_Z and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:

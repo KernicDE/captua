@@ -33,6 +33,7 @@ import shutil
 import sys
 import subprocess
 import threading
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -41,7 +42,6 @@ from PySide6.QtGui import QColor, QImage, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
-    QGraphicsPixmapItem,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -53,6 +53,8 @@ from . import __version__
 from .backdrop import BackdropPopup
 from .canvas import CanvasScene, CanvasView, draw_backdrop
 from .settings import apply_to_scene, extract_from_scene, load_settings, save_settings
+from .history import capture_state, push_changes
+from .imageio import load_image_file
 from .theme import TOAST_STYLE, WINDOW_BG
 from .toolbar import Toolbar
 from .tools import (
@@ -76,6 +78,23 @@ from .tools import (
     TextTool,
     ToolProperties,
 )
+
+
+def _write_new_file(path: Path, data: bytes) -> Path:
+    """Create `path` (owner-only) without ever overwriting or following a link;
+    on a name clash use -2, -3, … instead. Returns the path actually written."""
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    n = 1
+    while True:
+        target = path if n == 1 else path.with_name(f"{path.stem}-{n}{path.suffix}")
+        try:
+            fd = os.open(target, flags, 0o600)
+        except FileExistsError:
+            n += 1
+            continue
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        return target
 
 
 def _deliver_png(
@@ -103,8 +122,7 @@ def _deliver_png(
     if save_path is not None:
         try:
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            save_path.write_bytes(png_data)
-            saved_name = save_path.name
+            saved_name = _write_new_file(save_path, png_data).name
         except OSError:
             return False, ""
 
@@ -256,7 +274,6 @@ class OverlayWindow(QMainWindow):
         self._view.tool_finished.connect(self._on_tool_finished)
         self._view.tool_selected.connect(self._set_tool)
         self._scene.selectionChanged.connect(self._on_selection_changed)
-        self._scene.sceneRectChanged.connect(self._on_scene_rect_changed)
         self._scene.scene_rect_fitted.connect(self._on_scene_rect_fitted)
         self._copy_in_progress = False
         self.copy_finished.connect(self._on_copy_finished)
@@ -271,37 +288,30 @@ class OverlayWindow(QMainWindow):
         items = [i for i in self._scene.selectedItems() if i is not self._scene.base_image()]
         return len(items) == 1 and hasattr(items[0], "zoom_level")
 
+    def _edit_selected(self, setter: str, value) -> None:
+        """Apply a style change to the selection as one undoable step."""
+        base = self._scene.base_image()
+        items = [i for i in self._scene.selectedItems() if i is not base and hasattr(i, setter)]
+        before = {i: capture_state(i) for i in items}
+        for item in items:
+            getattr(item, setter)(value)
+        push_changes(self._scene, before)
+
     def _update_line_color(self, color) -> None:
         self._props.color = color
-        for item in self._scene.selectedItems():
-            if item is self._scene.base_image():
-                continue
-            if hasattr(item, "set_line_color"):
-                item.set_line_color(color)
+        self._edit_selected("set_line_color", color)
 
     def _update_line_width(self, width: float) -> None:
         self._props.stroke_width = width
-        for item in self._scene.selectedItems():
-            if item is self._scene.base_image():
-                continue
-            if hasattr(item, "set_line_width"):
-                item.set_line_width(width)
+        self._edit_selected("set_line_width", width)
 
     def _update_fill_color(self, color) -> None:
         self._props.fill_color = color
-        for item in self._scene.selectedItems():
-            if item is self._scene.base_image():
-                continue
-            if hasattr(item, "set_fill_color"):
-                item.set_fill_color(color)
+        self._edit_selected("set_fill_color", color)
 
     def _update_fill_alpha(self, alpha: int) -> None:
         self._props.fill_alpha = alpha
-        for item in self._scene.selectedItems():
-            if item is self._scene.base_image():
-                continue
-            if hasattr(item, "set_fill_alpha"):
-                item.set_fill_alpha(alpha)
+        self._edit_selected("set_fill_alpha", alpha)
 
     def _on_selection_changed(self) -> None:
         items = [i for i in self._scene.selectedItems() if i is not self._scene.base_image()]
@@ -333,11 +343,7 @@ class OverlayWindow(QMainWindow):
 
     def _update_magnifier_zoom(self, zoom: float) -> None:
         self._props.zoom_level = zoom
-        for item in self._scene.selectedItems():
-            if item is self._scene.base_image():
-                continue
-            if hasattr(item, "set_zoom_level"):
-                item.set_zoom_level(zoom)
+        self._edit_selected("set_zoom_level", zoom)
 
     def _update_snap(self, enabled: bool) -> None:
         self._scene.snap_enabled = enabled
@@ -380,8 +386,8 @@ class OverlayWindow(QMainWindow):
             "Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif)",
         )
         if file_path:
-            pixmap = QPixmap(file_path)
-            if not pixmap.isNull():
+            pixmap = load_image_file(file_path)
+            if pixmap is not None:
                 # Place at center of current view
                 center = self._view.mapToScene(self._view.viewport().rect().center())
                 pos = center - QPointF(pixmap.width() / 2, pixmap.height() / 2)
@@ -410,8 +416,8 @@ class OverlayWindow(QMainWindow):
         if mime.hasUrls():
             for url in mime.urls():
                 if url.isLocalFile():
-                    pixmap = QPixmap(url.toLocalFile())
-                    if not pixmap.isNull():
+                    pixmap = load_image_file(url.toLocalFile())
+                    if pixmap is not None:
                         center = self._view.mapToScene(self._view.viewport().rect().center())
                         pos = center - QPointF(pixmap.width() / 2, pixmap.height() / 2)
                         self._scene.add_image(pixmap, pos)
@@ -501,10 +507,6 @@ class OverlayWindow(QMainWindow):
             toolbar_w=toolbar_w,
         )
         self.resize(new_w, new_h)
-
-    def _on_scene_rect_changed(self, rect: QRectF) -> None:
-        """Scene rect changed — resizing is handled by _on_scene_rect_fitted."""
-        pass
 
     def _on_scene_rect_fitted(self, old_rect: QRectF, new_rect: QRectF) -> None:
         """Scene grew past the image edge (annotation drawn outside, image
@@ -635,22 +637,6 @@ class OverlayWindow(QMainWindow):
         super().resizeEvent(event)
         self._place_pills()
 
-    def add_capture(self, pixmap: QPixmap, direction: str = "vertical") -> None:
-        """Stitch a new capture onto the existing canvas."""
-        base = self._scene.base_image()
-        if base is None:
-            self._scene.set_base_image(pixmap)
-            return
-
-        if direction == "vertical":
-            # Place below the existing base image
-            pos = QPointF(base.x(), base.y() + base.pixmap().height())
-        else:
-            # Place to the right
-            pos = QPointF(base.x() + base.pixmap().width(), base.y())
-
-        self._scene.add_image(pixmap, pos)
-
     def render_to_pixmap(self) -> QPixmap:
         """Render the entire scene (with backdrop) to a pixmap at physical resolution."""
         base = self._scene.base_image()
@@ -658,7 +644,7 @@ class OverlayWindow(QMainWindow):
 
         # Full bounds of all items, plus backdrop padding
         items_rect = self._scene.itemsBoundingRect()
-        pad = self._scene.backdrop_padding
+        pad = self._scene.backdrop_padding if self._scene.backdrop_enabled else 0
         render_rect = items_rect.adjusted(-pad, -pad, pad, pad)
 
         physical_w = max(1, int(render_rect.width() * dpr))

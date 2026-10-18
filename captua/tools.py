@@ -6,7 +6,7 @@ from io import BytesIO
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, UnidentifiedImageError
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPen, QPixmap, QTextCursor
+from PySide6.QtGui import QColor, QMouseEvent, QPen, QPixmap, QTextCursor
 
 from .history import AddItemCommand, CropCommand
 from .items import (
@@ -26,12 +26,21 @@ from .items import (
     ShapeItem,
     SpotlightItem,
     TextItem,
+    render_region,
 )
 from PySide6.QtWidgets import QApplication, QGraphicsEllipseItem, QLabel
 
 
 def _shift_held(event: QMouseEvent) -> bool:
     return bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+
+
+def _constrain_45(start: QPointF, pos: QPointF) -> QPointF:
+    """`pos` moved onto the nearest 45-degree ray from `start` (Shift held)."""
+    dx, dy = pos.x() - start.x(), pos.y() - start.y()
+    snap = round(math.atan2(dy, dx) / (math.pi / 4)) * (math.pi / 4)
+    dist = math.hypot(dx, dy)
+    return QPointF(start.x() + dist * math.cos(snap), start.y() + dist * math.sin(snap))
 
 
 def _snap_pos(scene, pos: QPointF, exclude_item=None) -> QPointF:
@@ -215,15 +224,7 @@ class LineTool(Tool):
         if self._active_item is not None:
             if not _shift_held(event):
                 pos = _snap_pos(self.scene, pos, self._active_item)
-            if _shift_held(event):
-                dx = pos.x() - self._start.x()
-                dy = pos.y() - self._start.y()
-                angle = math.atan2(dy, dx)
-                snap = round(angle / (math.pi / 4)) * (math.pi / 4)
-                dist = math.hypot(dx, dy)
-                end = QPointF(self._start.x() + dist * math.cos(snap), self._start.y() + dist * math.sin(snap))
-            else:
-                end = pos
+            end = _constrain_45(self._start, pos) if _shift_held(event) else pos
             self._active_item.setLine(self._start.x(), self._start.y(), end.x(), end.y())
 
     def mouse_release(self, event: QMouseEvent, pos: QPointF) -> None:
@@ -243,15 +244,7 @@ class ArrowTool(Tool):
         if self._active_item is not None:
             if not _shift_held(event):
                 pos = _snap_pos(self.scene, pos, self._active_item)
-            if _shift_held(event):
-                dx = pos.x() - self._start.x()
-                dy = pos.y() - self._start.y()
-                angle = math.atan2(dy, dx)
-                snap = round(angle / (math.pi / 4)) * (math.pi / 4)
-                dist = math.hypot(dx, dy)
-                end = QPointF(self._start.x() + dist * math.cos(snap), self._start.y() + dist * math.sin(snap))
-            else:
-                end = pos
+            end = _constrain_45(self._start, pos) if _shift_held(event) else pos
             self._active_item.set_end(end)
 
     def mouse_release(self, event: QMouseEvent, pos: QPointF) -> None:
@@ -474,18 +467,13 @@ class BlurTool(Tool):
     def _blur_region(self, rect: QRectF) -> tuple[QPixmap, QPointF, int] | None:
         try:
             pad = 10
-            x = max(0, int(rect.x()) - pad)
-            y = max(0, int(rect.y()) - pad)
-            w = max(1, int(rect.width()) + pad * 2)
-            h = max(1, int(rect.height()) + pad * 2)
-            rw = int(rect.width())
-            rh = int(rect.height())
-
-            scene_pixmap = QPixmap(w, h)
-            scene_pixmap.fill(Qt.GlobalColor.transparent)
-            painter = QPainter(scene_pixmap)
-            self.scene.render(painter, QRectF(0, 0, w, h), QRectF(x, y, w, h))
-            painter.end()
+            # Work in device pixels so HiDPI screenshots are redacted at full resolution
+            scene_pixmap = render_region(self.scene, rect.adjusted(-pad, -pad, pad, pad))
+            dpr = scene_pixmap.devicePixelRatio()
+            w, h = scene_pixmap.width(), scene_pixmap.height()
+            pad_px = round(pad * dpr)
+            rw = max(1, w - 2 * pad_px)
+            rh = max(1, h - 2 * pad_px)
 
             ba = QByteArray()
             buf = QBuffer(ba)
@@ -496,26 +484,32 @@ class BlurTool(Tool):
             pil_img = Image.open(BytesIO(bytes(ba))).convert("RGBA")
             # Redaction: a Gaussian blur alone can be partly reversed, so average
             # the pixels into blocks first (information is gone), then smooth.
-            block = _REDACT_BLOCK
-            small = pil_img.resize((max(1, w // block), max(1, h // block)), Image.Resampling.BOX)
-            pil_img = small.resize((w, h), Image.Resampling.NEAREST)
-            pil_img = pil_img.filter(ImageFilter.GaussianBlur(radius=block / 2))
+            block = max(1, round(_REDACT_BLOCK * dpr))
+            # Premultiplied alpha ("RGBa") so the transparent area beyond the image
+            # edge does not darken or thin out the blocks next to it.
+            cover = pil_img.getchannel("A")
+            pre = pil_img.convert("RGBa")
+            small = pre.resize((max(1, w // block), max(1, h // block)), Image.Resampling.BOX)
+            pre = small.resize((w, h), Image.Resampling.NEAREST)
+            pil_img = pre.filter(ImageFilter.GaussianBlur(radius=block / 2)).convert("RGBA")
 
             # Mask: fully opaque over the selection (no original shines through),
             # feathered only outward into the padding
             sel = Image.new("L", (w, h), 0)
             draw = ImageDraw.Draw(sel)
-            draw.rectangle([pad, pad, pad + rw, pad + rh], fill=255)
-            mask = ImageChops.lighter(sel, sel.filter(ImageFilter.GaussianBlur(radius=pad)))
+            draw.rectangle([pad_px, pad_px, pad_px + rw, pad_px + rh], fill=255)
+            mask = ImageChops.lighter(sel, sel.filter(ImageFilter.GaussianBlur(radius=pad_px)))
 
-            r, g, b, a = pil_img.split()
-            a = ImageChops.multiply(a, mask)
+            r, g, b, _ = pil_img.split()
+            # Opaque exactly where the original had pixels inside the selection
+            a = ImageChops.multiply(cover, mask)
             pil_img = Image.merge("RGBA", (r, g, b, a))
 
             out_buf = BytesIO()
             pil_img.save(out_buf, format="PNG")
             result = QPixmap()
             result.loadFromData(QByteArray(out_buf.getvalue()))
+            result.setDevicePixelRatio(dpr)
             offset = QPointF(-pad, -pad)
             return result, offset, pad
         except (OSError, UnidentifiedImageError, ValueError):
@@ -553,6 +547,8 @@ class MagnifierTool(Tool):
             # Use a square bounding the circle for capture so the zoomed
             # pixmap fills the circular lens without distortion.
             radius = ellipse_rect.width() / 2
+            if radius < 8:
+                return  # a click without dragging must not create an invisible item
             capture_rect = QRectF(
                 self._center.x() - radius,
                 self._center.y() - radius,
@@ -579,15 +575,10 @@ class MagnifierTool(Tool):
 
     def _zoom_region(self, rect: QRectF) -> QPixmap | None:
         try:
-            w = max(1, int(rect.width()))
-            h = max(1, int(rect.height()))
             zoom = max(1.5, self.props.zoom_level)
-
-            scene_pixmap = QPixmap(w, h)
-            scene_pixmap.fill(Qt.GlobalColor.transparent)
-            painter = QPainter(scene_pixmap)
-            self.scene.render(painter, QRectF(0, 0, w, h), rect)
-            painter.end()
+            scene_pixmap = render_region(self.scene, rect)
+            dpr = scene_pixmap.devicePixelRatio()
+            w, h = scene_pixmap.width(), scene_pixmap.height()
 
             ba = QByteArray()
             buf = QBuffer(ba)
@@ -604,6 +595,7 @@ class MagnifierTool(Tool):
             pil_img.save(out_buf, format="PNG")
             result = QPixmap()
             result.loadFromData(QByteArray(out_buf.getvalue()))
+            result.setDevicePixelRatio(dpr)
             return result
         except (OSError, UnidentifiedImageError, ValueError):
             logging.exception("MagnifierTool._zoom_region failed")
@@ -708,12 +700,7 @@ class EyedropperTool(Tool):
         pass
 
     def _pick_color(self, pos: QPointF) -> QColor | None:
-        pixmap = QPixmap(1, 1)
-        pixmap.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(pixmap)
-        self.scene.render(painter, QRectF(0, 0, 1, 1), QRectF(pos.x(), pos.y(), 1, 1))
-        painter.end()
-        img = pixmap.toImage()
+        img = render_region(self.scene, QRectF(pos.x(), pos.y(), 1, 1)).toImage()
         if img.isNull():
             return None
         return QColor(img.pixel(0, 0))

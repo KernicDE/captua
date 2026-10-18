@@ -124,14 +124,23 @@ echo
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-if [ -f "${PROJECT_DIR}/pyproject.toml" ] && grep -q "name = \"captua\"" "${PROJECT_DIR}/pyproject.toml" 2>/dev/null; then
+# Only trust a checkout this script really lives in (scripts/install.sh), not
+# whatever project happens to sit next to a downloaded copy.
+if [ "${SCRIPT_DIR}" = "${PROJECT_DIR}/scripts" ] && [ -f "${PROJECT_DIR}/pyproject.toml" ] && grep -q "name = \"captua\"" "${PROJECT_DIR}/pyproject.toml" 2>/dev/null; then
     SOURCE_DIR="${PROJECT_DIR}"
     echo "Installing from local source: ${SOURCE_DIR}"
 else
     SOURCE_DIR="${INSTALL_DIR}/src"
     echo "Cloning from ${REPO_URL} ..."
     rm -rf "${SOURCE_DIR}"
-    git clone --depth 1 "${REPO_URL}" "${SOURCE_DIR}"
+    # Install the latest release tag, not the unreleased default branch
+    LATEST_TAG="$(git ls-remote --tags --refs --sort=-v:refname "${REPO_URL}" 'v*' | head -n 1 | sed 's|.*refs/tags/||')"
+    if [ -z "${LATEST_TAG}" ]; then
+        echo "ERROR: could not determine the latest Captua release." >&2
+        exit 1
+    fi
+    echo "Using release ${LATEST_TAG}"
+    git clone --depth 1 --branch "${LATEST_TAG}" "${REPO_URL}" "${SOURCE_DIR}"
 fi
 echo
 
@@ -144,7 +153,6 @@ rm -rf "${VENV_DIR}"
 "${PYTHON_CMD}" -m venv "${VENV_DIR}"
 
 echo "=== Installing Captua ==="
-"${VENV_DIR}/bin/pip" install --upgrade pip
 "${VENV_DIR}/bin/pip" install "${SOURCE_DIR}"
 echo
 

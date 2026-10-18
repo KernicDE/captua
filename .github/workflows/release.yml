@@ -13,7 +13,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Tag must match the package version
+        run: |
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)"
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match pyproject.toml version ${version}" >&2
+            exit 1
+          fi
 
       - name: Package release assets
         run: |
@@ -22,11 +30,13 @@ jobs:
           git archive --format=tar.gz --prefix=captua/ HEAD > release-assets/captua-source.tar.gz
           # Include the install script separately for convenience
           cp scripts/install.sh release-assets/
+          (cd release-assets && sha256sum captua-source.tar.gz install.sh > SHA256SUMS)
 
       - name: Upload to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: |
             release-assets/captua-source.tar.gz
             release-assets/install.sh
+            release-assets/SHA256SUMS
           generate_release_notes: true

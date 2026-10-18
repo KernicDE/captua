@@ -19,8 +19,11 @@ from . import __version__
 
 def _pid_file() -> Path:
     """Per-user PID file used to enforce the single running instance."""
-    runtime = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
-    return Path(runtime) / f"captua-overlay-{os.getuid()}.pid"
+    runtime = os.environ.get("XDG_RUNTIME_DIR")
+    if runtime:
+        return Path(runtime) / f"captua-overlay-{os.getuid()}.pid"
+    # No runtime dir: a private per-user directory, never a shared /tmp path
+    return Path.home() / ".cache" / "captua" / "overlay.pid"
 
 
 def _is_captua_process(pid: int) -> bool:
@@ -29,7 +32,12 @@ def _is_captua_process(pid: int) -> bool:
         cmdline = Path(f"/proc/{pid}/cmdline").read_bytes()
     except OSError:
         return False
-    return b"captua" in cmdline
+    # Match whole argv entries ("captua" launcher or "-m captua"), not any
+    # process that merely mentions the word (editor, pytest, a shell …)
+    args = cmdline.split(b"\0")
+    return any(a == b"captua" or a.endswith(b"/captua") for a in args) or (
+        b"-m" in args and b"captua" in args
+    )
 
 
 def ensure_single_instance() -> None:
@@ -59,7 +67,10 @@ def ensure_single_instance() -> None:
             pass
 
     try:
-        pid_file.write_text(str(os.getpid()), encoding="utf-8")
+        pid_file.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(pid_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(str(os.getpid()))
         atexit.register(lambda: pid_file.unlink(missing_ok=True))
     except OSError:
         pass

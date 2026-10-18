@@ -35,6 +35,37 @@ def _default_settings() -> dict:
     }
 
 
+# Numeric settings and their allowed range; anything else falls back to the default
+_RANGES = {
+    "backdrop_padding": (0, 400),
+    "backdrop_gradient_angle": (-360, 360),
+    "backdrop_corner_radius": (0, 200),
+    "canvas_corner_radius": (0, 200),
+    "line_width": (1, 200),
+    "fill_alpha": (0, 255),
+}
+_COLOR_KEYS = ("backdrop_color", "backdrop_gradient_start", "backdrop_gradient_end", "line_color", "fill_color")
+
+
+def _sanitize(merged: dict, defaults: dict) -> dict:
+    """Replace values of the wrong type or range by their defaults (the file is
+    hand-editable, a bad value must not crash the overlay)."""
+    for key, default in defaults.items():
+        value = merged[key]
+        if isinstance(default, bool):
+            ok = isinstance(value, bool)
+        elif key in _RANGES:
+            lo, hi = _RANGES[key]
+            ok = isinstance(value, (int, float)) and not isinstance(value, bool) and lo <= value <= hi
+        elif key in _COLOR_KEYS:
+            ok = isinstance(value, str) and QColor(value).isValid()
+        else:
+            ok = isinstance(value, str)
+        if not ok:
+            merged[key] = default
+    return merged
+
+
 def load_settings() -> dict:
     """Load settings from disk, returning defaults for missing keys."""
     defaults = _default_settings()
@@ -49,8 +80,7 @@ def load_settings() -> dict:
         return defaults
 
     # Merge with defaults so new keys are always present
-    merged = {**defaults, **data}
-    return merged
+    return _sanitize({**defaults, **data}, defaults)
 
 
 def save_settings(data: dict) -> None:

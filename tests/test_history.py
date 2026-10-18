@@ -7,6 +7,10 @@ class _FakeScene:
     def __init__(self):
         self.items_added = []
         self.items_removed = []
+        self._image_items = []
+
+    def _expand_scene_if_needed(self) -> None:
+        pass
 
     def addItem(self, item) -> None:
         self.items_added.append(item)

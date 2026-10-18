@@ -7,6 +7,9 @@ from PySide6.QtCore import QObject, QUrl, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 
 
+_MAX_NOTES = 20_000  # characters of release notes rendered in the dialog
+
+
 class UpdateChecker(QObject):
     """Asynchronous GitHub release checker."""
 
@@ -27,9 +30,17 @@ class UpdateChecker(QObject):
         )
         # GitHub requires a User-Agent header
         req.setRawHeader(b"User-Agent", b"captua-updater")
+        req.setTransferTimeout(10_000)
         self._nam.get(req)
 
     def _on_reply(self, reply: QNetworkReply) -> None:
+        try:
+            self._handle_reply(reply)
+        finally:
+            if hasattr(reply, "deleteLater"):
+                reply.deleteLater()
+
+    def _handle_reply(self, reply: QNetworkReply) -> None:
         if reply.error() != QNetworkReply.NetworkError.NoError:
             self.error.emit(reply.errorString())
             return
@@ -40,14 +51,18 @@ class UpdateChecker(QObject):
             self.error.emit(f"Invalid JSON: {exc}")
             return
 
-        tag = data.get("tag_name", "").lstrip("v")
-        body = data.get("body", "")
-        url = data.get("html_url", "")
+        if not isinstance(data, dict):
+            self.error.emit("Unexpected release data.")
+            return
+        tag = str(data.get("tag_name") or "").lstrip("v")
+        body = str(data.get("body") or "")[:_MAX_NOTES]
 
         if not re.fullmatch(r"\d+(\.\d+)*", tag):
             self.error.emit("No valid version found in release data.")
             return
 
+        # Built from the validated tag: never open a URL taken from the response
+        url = f"https://github.com/KernicDE/captua/releases/tag/v{tag}"
         if self._is_newer(tag, self._current):
             self.update_available.emit(tag, body, url)
         else:

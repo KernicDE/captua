@@ -140,28 +140,6 @@ EDIT_STYLE = f"""
     }}
 """
 
-SLIDER_STYLE = f"""
-    QSlider::groove:horizontal {{
-        height: 4px;
-        background: {PILL_BORDER};
-        border-radius: 2px;
-    }}
-    QSlider::handle:horizontal {{
-        width: 12px;
-        height: 12px;
-        margin: -4px 0;
-        border-radius: 6px;
-        background: {TEXT_DIM};
-    }}
-    QSlider::handle:horizontal:hover {{
-        background: {ACCENT};
-    }}
-    QSlider::sub-page:horizontal {{
-        background: {ACCENT};
-        border-radius: 2px;
-    }}
-"""
-
 SEPARATOR_STYLE = f"QFrame {{ background-color: {PILL_BORDER}; border: none; }}"
 
 PILL_STYLE = f"""
@@ -185,20 +163,3 @@ TOAST_STYLE = (
     f" border: 1px solid {PILL_BORDER}; border-radius: 12px;"
     " padding: 8px 16px; font-size: 12px;"
 )
-
-MENU_STYLE = f"""
-    QMenu {{
-        background-color: {PILL_BG};
-        color: {TEXT};
-        border: 1px solid {PILL_BORDER};
-        border-radius: 8px;
-        padding: 4px;
-    }}
-    QMenu::item {{
-        padding: 6px 20px;
-        border-radius: 4px;
-    }}
-    QMenu::item:selected {{
-        background-color: {HOVER_BG};
-    }}
-"""

@@ -4,7 +4,7 @@
 
 Captua is a fast, lightweight screenshot annotation tool (a Shottr clone) for **Linux / Wayland only**, written in Python with PySide6 (Qt6). It captures a region, screen, or window, opens it in a frameless overlay window with a `QGraphicsScene` canvas, and lets the user annotate, then copy or save the result.
 
-- Current version: **0.7.1** (kept in sync in `captua/__init__.py` and `pyproject.toml`)
+- Current version: **0.7.2** (kept in sync in `captua/__init__.py` and `pyproject.toml`)
 - Entry point: console script `captua = captua.main:main`
 - CLI modes: `captua` (region, default), `captua --screen|-s`, `captua --window|-w`, `captua --help|-h`
 - Repository: https://github.com/KernicDE/captua
@@ -47,17 +47,17 @@ captua/
                     # EmojiTool, LabelTool, RulerTool, SpotlightTool, BlurTool, MagnifierTool,
                     # EyedropperTool) + ToolProperties
   items.py          # QGraphicsItem subclasses for all annotations, CanvasImageItem,
-                    # CropOverlayItem, EyedropperItem
-  history.py        # Undo/redo command stack (Command, AddItemCommand, RemoveItemCommand, History)
+                    # CropOverlayItem, render_region()
+  history.py        # Undo/redo command stack (Add/Remove/Crop/StateCommand, History); StateCommand
+                    # covers move/resize/colour/width/z-order via snapshot()/push_changes()
+  __main__.py       # `python -m captua` (used by the self-updater restart)
   settings.py       # JSON persistence to ~/.config/captua/settings.json (atomic write via tmp file)
   backdrop.py       # BackdropPopup (live-preview backdrop settings) + _AngleDial widget
-  colorwheel.py     # Color picker dialog (ColorWheelDialog)
-  popups.py         # ShapePopup, EmojiPopup, MagnifierPopup selector popups
-  shapes.py         # Pre-defined shape paths + ShapePickerDialog
-  emojipicker.py    # Emoji data/model + EmojiPickerDialog
+  popups.py         # ColorPalettePopup, ShapePopup, EmojiPopup (open above their button)
+  imageio.py        # load_image_file(): safe loading of dropped/pasted/imported images
   updater.py        # Async GitHub release checker (UpdateChecker, QNetworkAccessManager)
   update_dialog.py  # Non-blocking update-available dialog; triggers SelfUpdater
-  self_updater.py   # pip install --upgrade from GitHub release tarball via QProcess, then os.execl restart
+  self_updater.py   # pip install --upgrade from GitHub release tarball via QProcess (-P, cwd=home), then os.execl restart
 tests/              # pytest suite (see Testing)
 scripts/
   install.sh        # End-user installer (distro detection, venv at ~/.local/share/captua, .desktop entry)

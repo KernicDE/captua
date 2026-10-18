@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
-import tempfile
+from pathlib import Path
 
 from PySide6.QtCore import QObject, QProcess, Signal
 
@@ -29,7 +29,13 @@ class SelfUpdater(QObject):
         self.progress.emit("Downloading and installing update…")
         self._proc = QProcess(self)
         self._proc.finished.connect(self._on_pip_finished)
-        self._proc.start(sys.executable, ["-m", "pip", *args])
+        self._start_pip(args)
+
+    def _start_pip(self, args: list[str]) -> None:
+        # -P and a neutral cwd: never import pip (or anything else) from the
+        # directory Captua happened to be started in.
+        self._proc.setWorkingDirectory(str(Path.home()))
+        self._proc.start(sys.executable, ["-P", "-m", "pip", *args])
 
     def _on_pip_finished(self, exit_code: int, _exit_status) -> None:
         if exit_code != 0:
@@ -53,7 +59,7 @@ class SelfUpdater(QObject):
         url = f"https://github.com/KernicDE/captua/archive/refs/tags/v{self._version}.tar.gz"
         self._proc = QProcess(self)
         self._proc.finished.connect(self._on_user_pip_finished)
-        self._proc.start(sys.executable, ["-m", "pip", "install", "--upgrade", "--user", url])
+        self._start_pip(["install", "--upgrade", "--user", url])
 
     def _on_user_pip_finished(self, exit_code: int, _exit_status) -> None:
         if exit_code != 0:
@@ -70,9 +76,9 @@ class SelfUpdater(QObject):
     def restart() -> None:
         """Replace the current process with a fresh instance of Captua.
 
-        We chdir to a temp directory first so that the old source folder
-        (if the user is running from a git clone) does not shadow the
-        newly installed package on PYTHONPATH.
+        -P keeps the current directory off sys.path, so neither a git clone
+        nor a planted package in a shared directory can shadow the newly
+        installed one.
         """
-        os.chdir(tempfile.gettempdir())
-        os.execl(sys.executable, sys.executable, "-m", "captua", *sys.argv[1:])
+        os.chdir(Path.home())
+        os.execl(sys.executable, sys.executable, "-P", "-m", "captua", *sys.argv[1:])
