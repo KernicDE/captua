@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QPushButton,
     QWidget,
 )
@@ -244,6 +245,7 @@ class Toolbar(QWidget):
     close_triggered = Signal()
     save_triggered = Signal()
     copy_triggered = Signal()
+    upload_triggered = Signal(bool)  # permanent
     import_image_triggered = Signal()
     capture_triggered = Signal()
     backdrop_settings_triggered = Signal()
@@ -299,6 +301,16 @@ class Toolbar(QWidget):
         self._save_btn.setToolTip("Save (Ctrl+S)")
         self._save_btn.clicked.connect(self.save_triggered.emit)
         action_layout.addWidget(self._save_btn)
+
+        self._upload_btn = QPushButton("Upload")
+        self._upload_btn.setFixedHeight(28)
+        self._upload_btn.setStyleSheet(ACTION_BUTTON_STYLE)
+        self._upload_btn.setToolTip("Upload and copy the link (Ctrl+U temporary, Ctrl+Shift+U permanent)")
+        upload_menu = QMenu(self._upload_btn)
+        upload_menu.addAction("Temporary link (Litterbox)", lambda: self.upload_triggered.emit(False))
+        upload_menu.addAction("Permanent link (Catbox)", lambda: self.upload_triggered.emit(True))
+        self._upload_btn.setMenu(upload_menu)
+        action_layout.addWidget(self._upload_btn)
 
         self._copy_btn = QPushButton("Copy")
         self._copy_btn.setFixedHeight(28)
@@ -520,6 +532,9 @@ class Toolbar(QWidget):
 
     def set_copy_enabled(self, enabled: bool) -> None:
         self._copy_btn.setEnabled(enabled)
+
+    def set_upload_enabled(self, enabled: bool) -> None:
+        self._upload_btn.setEnabled(enabled)
 
     def set_sticky(self, enabled: bool) -> None:
         self._sticky_btn.setChecked(enabled)

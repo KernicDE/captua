@@ -4,7 +4,7 @@
 
 Captua is a fast, lightweight screenshot annotation tool (a Shottr clone) for **Linux / Wayland only**, written in Python with PySide6 (Qt6). It captures a region, screen, or window, opens it in a frameless overlay window with a `QGraphicsScene` canvas, and lets the user annotate, then copy or save the result.
 
-- Current version: **0.7.2** (kept in sync in `captua/__init__.py` and `pyproject.toml`)
+- Current version: **0.8.0** (kept in sync in `captua/__init__.py` and `pyproject.toml`)
 - Entry point: console script `captua = captua.main:main`
 - CLI modes: `captua` (region, default), `captua --screen|-s`, `captua --window|-w`, `captua --help|-h`
 - Repository: https://github.com/KernicDE/captua
@@ -56,6 +56,7 @@ captua/
   popups.py         # ColorPalettePopup, ShapePopup, EmojiPopup (open above their button)
   imageio.py        # load_image_file(): safe loading of dropped/pasted/imported images
   updater.py        # Async GitHub release checker (UpdateChecker, QNetworkAccessManager)
+  uploader.py       # Anonymous upload (Litterbox temporary / Catbox permanent), link validated against catbox.moe hosts
   update_dialog.py  # Non-blocking update-available dialog; triggers SelfUpdater
   self_updater.py   # pip install --upgrade from GitHub release tarball via QProcess (-P, cwd=home), then os.execl restart
 tests/              # pytest suite (see Testing)

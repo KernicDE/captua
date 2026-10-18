@@ -6,6 +6,8 @@ from pathlib import Path
 
 from PySide6.QtGui import QColor
 
+from .uploader import EXPIRIES
+
 CONFIG_DIR = Path.home() / ".config" / "captua"
 CONFIG_FILE = CONFIG_DIR / "settings.json"
 
@@ -29,6 +31,8 @@ def _default_settings() -> dict:
         "auto_save_on_copy": True,
         "sticky_tools": False,
         "update_check_enabled": True,
+        "upload_consent": False,
+        "upload_expiry": "24h",
         "skipped_version": "",
         "screenshots_folder": "~/Pictures/Screenshots",
         "screenshot_filename_template": "captua-{timestamp}.png",
@@ -57,6 +61,8 @@ def _sanitize(merged: dict, defaults: dict) -> dict:
         elif key in _RANGES:
             lo, hi = _RANGES[key]
             ok = isinstance(value, (int, float)) and not isinstance(value, bool) and lo <= value <= hi
+        elif key == "upload_expiry":
+            ok = value in EXPIRIES
         elif key in _COLOR_KEYS:
             ok = isinstance(value, str) and QColor(value).isValid()
         else:

@@ -16,6 +16,7 @@ A fast, lightweight screenshot annotation tool for **Linux / Wayland**.
 - **Self-sizing window** — content + 50px margin, grows with your annotations, always fits the toolbar, capped at the available screen space
 - **Single instance** — starting a new capture closes the previous overlay
 - **Annotations** — rectangles, circles, arrows, pen, marker, text, labels, emojis, shapes, blur, magnifier, ruler, spotlight, numbering, eyedropper
+- **Upload** (`Ctrl+U`) — free anonymous link via Litterbox (expiring) or Catbox (permanent), asks before sending
 - **Instant copy** (`Ctrl+C`) — clipboard handoff and auto-save happen in the background, the window closes right away
 - **Save** (`Ctrl+S`) with configurable folder and filename template
 - **Undo / redo**, layer ordering, drag & drop, paste from clipboard
@@ -241,6 +242,7 @@ Starting Captua while an overlay is still open closes the old instance automatic
 | Key | Action |
 |-----|--------|
 | `Ctrl + C` | Copy image to clipboard (auto-saves and closes) |
+| `Ctrl + U` / `Ctrl + Shift + U` | Upload anonymously and copy the link (Litterbox, expiry `upload_expiry` 1h/12h/24h/72h / Catbox, permanent) |
 | `Ctrl + S` | Save image to disk |
 | `Ctrl + V` | Paste image from clipboard |
 | `Ctrl + Z` | Undo |

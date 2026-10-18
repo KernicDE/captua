@@ -52,6 +52,7 @@ from PySide6.QtWidgets import (
 from . import __version__
 from .backdrop import BackdropPopup
 from .canvas import CanvasScene, CanvasView, draw_backdrop
+from .uploader import PERMANENT, Uploader
 from .settings import apply_to_scene, extract_from_scene, load_settings, save_settings
 from .history import capture_state, push_changes
 from .imageio import load_image_file
@@ -264,6 +265,7 @@ class OverlayWindow(QMainWindow):
         self._toolbar.close_triggered.connect(self.close)
         self._toolbar.save_triggered.connect(self.save_to_disk)
         self._toolbar.copy_triggered.connect(self.copy_to_clipboard)
+        self._toolbar.upload_triggered.connect(self.upload_image)
         self._toolbar.import_image_triggered.connect(self._import_image)
         self._toolbar.capture_triggered.connect(self._capture_region)
         self._toolbar.backdrop_settings_triggered.connect(self._show_backdrop_dialog)
@@ -277,6 +279,10 @@ class OverlayWindow(QMainWindow):
         self._scene.scene_rect_fitted.connect(self._on_scene_rect_fitted)
         self._copy_in_progress = False
         self.copy_finished.connect(self._on_copy_finished)
+        self._uploading = False
+        self._uploader = Uploader(self)
+        self._uploader.finished.connect(self._on_upload_finished)
+        self._uploader.failed.connect(self._on_upload_failed)
 
     def _set_tool(self, name: str) -> None:
         tool = self._tools.get(name)
@@ -731,6 +737,51 @@ class OverlayWindow(QMainWindow):
             args=(image, save_path, use_wl_copy),
             daemon=True,
         ).start()
+
+    def upload_image(self, permanent: bool = False) -> None:
+        """Upload the rendered scene (Litterbox, or Catbox if permanent) and copy the link.
+
+        Asks for consent each time for permanent uploads (they cannot be deleted
+        anonymously), once for temporary ones."""
+        if self._uploading:
+            return
+        if permanent:
+            question = (
+                "The image is sent to catbox.moe, a third-party host, and stays online "
+                "permanently. Anonymous uploads cannot be deleted. Anyone with the link can view it."
+            )
+        elif not self._settings.get("upload_consent"):
+            question = (
+                "The image is sent to litterbox.catbox.moe, a third-party host. Anyone with "
+                f"the link can view it until it expires ({self._settings.get('upload_expiry', '24h')})."
+            )
+        else:
+            question = ""
+        if question:
+            answer = QMessageBox.question(self, "Upload screenshot", f"{question}\n\nUpload now?")
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            if not permanent:
+                self._settings["upload_consent"] = True
+        buffer = QBuffer()
+        buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+        self.render_to_pixmap().toImage().save(buffer, "PNG")
+        self._uploading = True
+        self._toolbar.set_upload_enabled(False)
+        self._show_toast("Uploading…", 60_000)
+        self._uploader.upload(bytes(buffer.data()), PERMANENT if permanent else self._settings.get("upload_expiry", "24h"))
+
+    def _on_upload_finished(self, link: str) -> None:
+        self._uploading = False
+        self._toolbar.set_upload_enabled(True)
+        QApplication.clipboard().setText(link)
+        self._show_toast("Link copied")
+
+    def _on_upload_failed(self, message: str) -> None:
+        self._uploading = False
+        self._toolbar.set_upload_enabled(True)
+        self._show_toast("Upload failed")
+        QMessageBox.warning(self, "Upload failed", message)
 
     def _deliver_copy(self, image: QImage, save_path: Path | None, use_wl_copy: bool) -> None:
         ok, saved_name = _deliver_png(image, save_path, use_wl_copy)

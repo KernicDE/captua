@@ -27,7 +27,7 @@ python3 -m captua.main [--screen | --window]
 Four floating pills in the window corners:
 
 - **Top-left:** Close (`Esc`)
-- **Top-right:** Backdrop settings, Snap toggle, Import image, Capture region, **Save** (`Ctrl+S`) and the primary **Copy** button (`Ctrl+C`)
+- **Top-right:** Backdrop settings, Snap toggle, Import image, Capture region, **Save** (`Ctrl+S`), **Upload** (`Ctrl+U` temporary via Litterbox, `Ctrl+Shift+U` permanent via Catbox; copies the link) and the primary **Copy** button (`Ctrl+C`)
 - **Bottom-left:** the tool buttons (see table below) plus a **pin toggle** to keep the active tool after drawing
 - **Bottom-right:** the contextual property controls (stroke colour/width, fill colour/opacity) — only visible when a drawing tool is active or an item is selected
 
@@ -121,6 +121,7 @@ Changes are previewed live. Settings persist between sessions.
 | `Esc` | Clear text focus → clear selection → close overlay |
 | `Ctrl+S` | Save to file |
 | `Ctrl+C` | Copy to clipboard |
+| `Ctrl+U` / `Ctrl+Shift+U` | Upload, copy link (temporary 24h / permanent) |
 | `Ctrl+V` | Paste image from clipboard |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Shift+Z` | Redo |

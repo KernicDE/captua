@@ -774,6 +774,8 @@ class CanvasView(QGraphicsView):
             "<td><b>Ctrl+Y</b></td><td>Redo</td></tr>"
             "<tr><td><b>Ctrl+C</b></td><td>Copy & save</td>"
             "<td><b>Ctrl+S</b></td><td>Save as</td></tr>"
+            "<tr><td><b>Ctrl+U</b></td><td>Upload (temporary)</td>"
+            "<td><b>Ctrl+Shift+U</b></td><td>Upload (permanent)</td></tr>"
             "<tr><td><b>Del</b></td><td>Delete selection</td>"
             "<td><b>PgUp/PgDn</b></td><td>Layer order</td></tr>"
             "<tr><td><b>Esc</b></td><td>Deselect / Close</td>"
@@ -895,6 +897,11 @@ class CanvasView(QGraphicsView):
             win = self.window()
             if hasattr(win, "paste_from_clipboard"):
                 win.paste_from_clipboard()
+            event.accept()
+        elif event.key() == Qt.Key.Key_U and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            win = self.window()
+            if hasattr(win, "upload_image"):
+                win.upload_image(bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier))
             event.accept()
         elif event.key() == Qt.Key.Key_S and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             win = self.window()
