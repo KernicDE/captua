@@ -56,7 +56,7 @@ from .uploader import PERMANENT, Uploader
 from .settings import apply_to_scene, extract_from_scene, load_settings, save_settings
 from .history import capture_state, push_changes
 from .imageio import load_image_file
-from .theme import TOAST_STYLE, WINDOW_BG
+from .theme import DIALOG_STYLE, TOAST_STYLE, WINDOW_BG
 from .toolbar import Toolbar
 from .tools import (
     ArrowTool,
@@ -738,6 +738,14 @@ class OverlayWindow(QMainWindow):
             daemon=True,
         ).start()
 
+    def _dialog(self, icon, title: str, text: str, ask: bool = False) -> bool:
+        """Themed message box; returns True when the user confirmed (ask=True)."""
+        box = QMessageBox(icon, title, text, parent=self)
+        box.setStyleSheet(DIALOG_STYLE)
+        if ask:
+            box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        return box.exec() == QMessageBox.StandardButton.Yes
+
     def upload_image(self, permanent: bool = False) -> None:
         """Upload the rendered scene (Litterbox, or Catbox if permanent) and copy the link.
 
@@ -758,8 +766,7 @@ class OverlayWindow(QMainWindow):
         else:
             question = ""
         if question:
-            answer = QMessageBox.question(self, "Upload screenshot", f"{question}\n\nUpload now?")
-            if answer != QMessageBox.StandardButton.Yes:
+            if not self._dialog(QMessageBox.Icon.Question, "Upload screenshot", f"{question}\n\nUpload now?", ask=True):
                 return
             if not permanent:
                 self._settings["upload_consent"] = True
@@ -781,7 +788,7 @@ class OverlayWindow(QMainWindow):
         self._uploading = False
         self._toolbar.set_upload_enabled(True)
         self._show_toast("Upload failed")
-        QMessageBox.warning(self, "Upload failed", message)
+        self._dialog(QMessageBox.Icon.Warning, "Upload failed", message)
 
     def _deliver_copy(self, image: QImage, save_path: Path | None, use_wl_copy: bool) -> None:
         ok, saved_name = _deliver_png(image, save_path, use_wl_copy)
@@ -791,8 +798,8 @@ class OverlayWindow(QMainWindow):
         self._copy_in_progress = False
         self._toolbar.set_copy_enabled(True)
         if not ok:
-            QMessageBox.critical(
-                self,
+            self._dialog(
+                QMessageBox.Icon.Critical,
                 "Save Failed",
                 "Could not auto-save the screenshot to "
                 f"{self._settings.get('screenshots_folder', '~/Pictures/Screenshots')}.\n"

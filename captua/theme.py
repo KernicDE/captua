@@ -163,3 +163,20 @@ TOAST_STYLE = (
     f" border: 1px solid {PILL_BORDER}; border-radius: 12px;"
     " padding: 8px 16px; font-size: 12px;"
 )
+
+MENU_STYLE = f"""
+QMenu {{ background-color: {PILL_BG}; color: {TEXT}; border: 1px solid {PILL_BORDER};
+         border-radius: {RADIUS_BUTTON}px; padding: 4px; }}
+QMenu::item {{ padding: 6px 16px; border-radius: 6px; }}
+QMenu::item:selected {{ background-color: {HOVER_BG}; }}
+"""
+
+# Dialogs inherit the overlay's dark background but not its text colour, so the
+# platform theme can leave them dark-on-dark.
+DIALOG_STYLE = f"""
+QMessageBox {{ background-color: {PILL_BG}; }}
+QMessageBox QLabel {{ color: {TEXT}; background: transparent; }}
+QMessageBox QPushButton {{ background-color: {HOVER_BG}; color: {TEXT}; border: 1px solid {PILL_BORDER};
+                           border-radius: {RADIUS_BUTTON}px; padding: 5px 16px; min-width: 60px; }}
+QMessageBox QPushButton:hover {{ background-color: {PRESSED_BG}; }}
+"""

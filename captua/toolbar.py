@@ -17,6 +17,7 @@ from .popups import PRESET_COLORS, ColorPalettePopup, EmojiPopup, ShapePopup
 from .theme import (
     ACTION_BUTTON_STYLE,
     EDIT_STYLE,
+    MENU_STYLE,
     PILL_STYLE,
     PRIMARY_BUTTON_STYLE,
     SEPARATOR_STYLE,
@@ -307,6 +308,7 @@ class Toolbar(QWidget):
         self._upload_btn.setStyleSheet(ACTION_BUTTON_STYLE)
         self._upload_btn.setToolTip("Upload and copy the link (Ctrl+U temporary, Ctrl+Shift+U permanent)")
         upload_menu = QMenu(self._upload_btn)
+        upload_menu.setStyleSheet(MENU_STYLE)
         upload_menu.addAction("Temporary link (Litterbox)", lambda: self.upload_triggered.emit(False))
         upload_menu.addAction("Permanent link (Catbox)", lambda: self.upload_triggered.emit(True))
         self._upload_btn.setMenu(upload_menu)

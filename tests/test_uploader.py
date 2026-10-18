@@ -31,7 +31,7 @@ def test_invalid_expiry_falls_back_to_default():
 def test_overlay_upload_flow(qapp, tmp_path, monkeypatch):
     """Consent is asked once for temporary uploads, always for permanent ones; the link lands in the clipboard."""
     from PySide6.QtGui import QColor, QPixmap
-    from PySide6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtWidgets import QApplication
 
     import captua.settings as settings_module
     from captua.overlay import OverlayWindow
@@ -39,8 +39,8 @@ def test_overlay_upload_flow(qapp, tmp_path, monkeypatch):
     monkeypatch.setattr(settings_module, "CONFIG_DIR", tmp_path / "cfg")
     monkeypatch.setattr(settings_module, "CONFIG_FILE", tmp_path / "cfg" / "settings.json")
     asked, sent = [], []
-    monkeypatch.setattr(QMessageBox, "question", lambda *a: asked.append(a[2]) or QMessageBox.StandardButton.Yes)
     win = OverlayWindow()
+    monkeypatch.setattr(win, "_dialog", lambda icon, title, text, ask=False: asked.append(text) or True)
     pm = QPixmap(40, 30)
     pm.fill(QColor("#336699"))
     win.set_image(pm)
