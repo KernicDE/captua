@@ -105,3 +105,17 @@ def test_redaction_interior_is_opaque(qapp):
     # Every pixel inside the selection (even next to its edge) must be fully opaque
     for x, y in [(pad + 1, pad + 1), (pad + 79, pad + 59), (pad + 40, pad + 1)]:
         assert img.pixelColor(x, y).alpha() == 255
+
+
+def test_zoom_out_builds_exact_lanczos_pixmap(qapp):
+    from PySide6.QtCore import QEventLoop, QTimer
+    from captua.items import CanvasImageItem
+
+    item = CanvasImageItem(QPixmap(400, 300))
+    item._pending_key = (200, 150)
+    item._build_exact((200, 150))
+    assert item._exact_key == (200, 150)
+    assert (item._exact.width(), item._exact.height()) == (200, 150)
+    item._pending_key = (100, 75)
+    item._build_exact((50, 40))  # stale key: zoom moved on, must be ignored
+    assert item._exact_key == (200, 150)

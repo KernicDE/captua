@@ -4,6 +4,7 @@ import math
 
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import (
+    QImage,
     QColor,
     QFocusEvent,
     QFont,
@@ -1332,6 +1333,9 @@ class CanvasImageItem(QGraphicsPixmapItem):
         self.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
         self._corner_radius = corner_radius
         self._mips: list[QPixmap] = []
+        self._exact: QPixmap | None = None
+        self._exact_key: tuple[int, int] | None = None
+        self._pending_key: tuple[int, int] | None = None
         # Images are not movable — only annotations should expand the backdrop
         self.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
 
@@ -1363,19 +1367,57 @@ class CanvasImageItem(QGraphicsPixmapItem):
             path = QPainterPath()
             path.addRoundedRect(self.boundingRect(), self._corner_radius, self._corner_radius)
             painter.setClipPath(path)
-        # Zoomed out, plain bilinear sampling skips pixels (aliasing). Draw from
-        # a mipmap level that is at most 2x larger than the target instead; the
-        # levels are built once, so zooming stays fast.
         pm = self.pixmap()
-        dev_scale = painter.worldTransform().m11() * painter.device().devicePixelRatioF()
-        target_w = self.boundingRect().width() * dev_scale
-        if 0 < target_w < pm.width():
-            level = self._mip_level(int(math.log2(pm.width() / target_w)))
-            if level is not pm:
-                painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
-                painter.drawPixmap(self.boundingRect(), level, QRectF(level.rect()))
-                return
-        super().paint(painter, option, widget)
+        dpr = painter.device().devicePixelRatioF()
+        rect = painter.worldTransform().mapRect(self.boundingRect())  # device-independent px
+        key = (round(rect.width() * dpr), round(rect.height() * dpr))  # target size in device px
+        exact = pm if key == (pm.width(), pm.height()) else (
+            self._exact if key == self._exact_key else None
+        )
+        if exact is not None:
+            # 1:1 device pixels, snapped to the pixel grid: no resampling blur,
+            # no moiré, thin strokes keep their width.
+            painter.save()
+            painter.resetTransform()
+            target = QRectF(
+                round(rect.x() * dpr) / dpr, round(rect.y() * dpr) / dpr,
+                key[0] / dpr, key[1] / dpr,
+            )
+            painter.drawPixmap(target, exact, QRectF(exact.rect()))
+            painter.restore()
+            return
+        if key[0] < pm.width():
+            # Zooming out: quick mipmap preview now, exact Lanczos once zoom settles
+            level = self._mip_level(int(math.log2(pm.width() / max(key[0], 1))))
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+            painter.drawPixmap(self.boundingRect(), level, QRectF(level.rect()))
+            if key != self._pending_key:
+                self._pending_key = key
+                QTimer.singleShot(150, lambda k=key: self._build_exact(k))
+            return
+        # Zooming in: smooth up to 2x, crisp pixels beyond (text stays readable)
+        painter.setRenderHint(
+            QPainter.RenderHint.SmoothPixmapTransform, key[0] < pm.width() * 2
+        )
+        painter.drawPixmap(self.boundingRect(), pm, QRectF(pm.rect()))
+
+    def _build_exact(self, key: tuple[int, int]) -> None:
+        """Resample the pixmap to exactly `key` with Lanczos (area-aware downscale)."""
+        if key != self._pending_key:
+            return  # zoom moved on
+        try:
+            from PIL import Image
+
+            img = self.pixmap().toImage().convertToFormat(QImage.Format.Format_RGBA8888)
+            w, h = img.width(), img.height()
+            src = Image.frombytes("RGBA", (w, h), bytes(img.constBits()))
+            out = src.resize(key, Image.Resampling.LANCZOS)
+            qimg = QImage(out.tobytes(), key[0], key[1], 4 * key[0], QImage.Format.Format_RGBA8888)
+            self._exact = QPixmap.fromImage(qimg.copy())
+            self._exact_key = key
+            self.update()
+        except RuntimeError:
+            pass  # item was deleted (e.g. replaced by a crop) before the timer fired
 
 
 class EyedropperItem(QGraphicsItem):
