@@ -40,31 +40,20 @@ def _is_captua_process(pid: int) -> bool:
     )
 
 
-def ensure_single_instance() -> None:
-    """Terminate a previously running Captua instance and record our PID.
+def ensure_single_instance() -> bool:
+    """Record our PID; return False if another Captua instance is running.
 
-    Captua is a one-shot annotation overlay: starting a new capture means
-    the old overlay is stale, so it gets a SIGTERM (with a short grace
-    period) before the new instance takes over.
+    Repeated key presses must not stack overlays, so a running instance
+    wins and the new one exits.
     """
     pid_file = _pid_file()
-    old_pid: int | None = None
     try:
         old_pid = int(pid_file.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
-        pass
+        old_pid = None
 
     if old_pid is not None and old_pid != os.getpid() and _is_captua_process(old_pid):
-        try:
-            os.kill(old_pid, signal.SIGTERM)
-            for _ in range(20):  # up to 2 s grace period
-                time.sleep(0.1)
-                try:
-                    os.kill(old_pid, 0)
-                except OSError:
-                    break
-        except OSError:
-            pass
+        return False
 
     try:
         pid_file.parent.mkdir(parents=True, exist_ok=True)
@@ -74,6 +63,7 @@ def ensure_single_instance() -> None:
         atexit.register(lambda: pid_file.unlink(missing_ok=True))
     except OSError:
         pass
+    return True
 
 
 def main() -> int:
@@ -120,8 +110,8 @@ def main() -> int:
             print("  --window, -w   Capture the active window")
             return 0
 
-    # A new capture replaces any still-open overlay from a previous run
-    ensure_single_instance()
+    if not ensure_single_instance():
+        return 0
 
     try:
         if capture_mode == "region":

@@ -2,7 +2,6 @@
 
 import os
 import subprocess
-import time
 
 import pytest
 
@@ -21,16 +20,18 @@ class TestEnsureSingleInstance:
         main_module.ensure_single_instance()
         assert int(pid_file.read_text().strip()) == os.getpid()
 
-    def test_terminates_previous_instance(self, pid_file, monkeypatch) -> None:
+    def test_running_instance_blocks_new_one(self, pid_file, monkeypatch) -> None:
         proc = subprocess.Popen(["sleep", "30"])
-        pid_file.write_text(str(proc.pid))
-        monkeypatch.setattr(main_module, "_is_captua_process", lambda pid: True)
+        try:
+            pid_file.write_text(str(proc.pid))
+            monkeypatch.setattr(main_module, "_is_captua_process", lambda pid: True)
 
-        main_module.ensure_single_instance()
-
-        proc.wait(timeout=5)
-        assert proc.poll() is not None  # terminated
-        assert int(pid_file.read_text().strip()) == os.getpid()
+            assert main_module.ensure_single_instance() is False
+            assert proc.poll() is None  # old instance untouched
+            assert int(pid_file.read_text().strip()) == proc.pid
+        finally:
+            proc.terminate()
+            proc.wait(timeout=5)
 
     def test_stale_pid_file_is_ignored(self, pid_file, monkeypatch) -> None:
         # PID that (almost certainly) does not exist
