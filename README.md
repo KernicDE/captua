@@ -16,7 +16,7 @@ A fast, lightweight screenshot annotation tool for **Linux / Wayland**.
 - **Self-sizing window** — content + 50px margin, grows with your annotations, always fits the toolbar, capped at the available screen space
 - **Single instance** — starting a new capture closes the previous overlay
 - **Annotations** — rectangles, circles, arrows, pen, marker, text, labels, emojis, shapes, blur, magnifier, ruler, spotlight, numbering, eyedropper
-- **Upload** (`Ctrl+U`) — free anonymous link via Litterbox (expiring) or Catbox (permanent), asks before sending
+- **Upload** (`Ctrl+U`) — free anonymous link via Litterbox (expiring) or Catbox (permanent), asks before sending, shows a progress bar, and offers a permanent Catbox upload when Litterbox answers with a server error
 - **Instant copy** (`Ctrl+C`) — clipboard handoff and auto-save happen in the background, the window closes right away
 - **Save** (`Ctrl+S`) with configurable folder and filename template
 - **Undo / redo**, layer ordering, drag & drop, paste from clipboard
